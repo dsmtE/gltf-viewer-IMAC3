@@ -6,6 +6,12 @@
 #include "utils/shaders.hpp"
 
 #include <tiny_gltf.h>
+
+struct VaoRange {
+  GLsizei begin; // Index of first element in vertexArrayObjects
+  GLsizei count; // Number of elements in range
+};
+
 class ViewerApplication
 {
 public:
@@ -18,11 +24,7 @@ public:
 
 private:
   // A range of indices in a vector containing Vertex Array Objects
-  struct VaoRange
-  {
-    GLsizei begin; // Index of first element in vertexArrayObjects
-    GLsizei count; // Number of elements in range
-  };
+  
 
   GLsizei m_nWindowWidth = 1280;
   GLsizei m_nWindowHeight = 720;
@@ -58,4 +60,7 @@ private:
     before most of OpenGL function calls.
   */
   bool loadGltfFile(tinygltf::Model &model);
+  std::vector<GLuint> createBufferObjects(const tinygltf::Model& model);
+  std::vector<GLuint> createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
+  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos);
 };

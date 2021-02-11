@@ -57,9 +57,14 @@ int ViewerApplication::run()
   bool loadModel = loadGltfFile(model);
   if (!loadModel) { return -1; }
 
-  // TODO Creation of Buffer Objects
+  const std::vector<GLuint> bufferObjects = createBufferObjects(model);
 
-  // TODO Creation of Vertex Array Objects
+  const std::vector<std::pair<std::string, GLuint>> attributesNamesAndIndex = {{
+    {"POSITION", 0}, {"NORMAL", 1}, {"TEXCOORD_0", 2}
+  }};
+
+  std::vector<VaoRange> meshVAOInfos;
+  std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos);
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
@@ -197,4 +202,85 @@ bool ViewerApplication::loadGltfFile(tinygltf::Model &model) {
   if (!ret) { std::cerr << "Failed to parse glTF file" << std::endl; }
 
   return ret;
+}
+
+std::vector<GLuint> ViewerApplication::createBufferObjects(const tinygltf::Model &model) {
+  std::vector<GLuint> bufferObjects(model.buffers.size(), 0);
+
+  glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data());
+
+  for (size_t i = 0; i < model.buffers.size(); ++i) {
+    glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[i]);
+    glBufferStorage(GL_ARRAY_BUFFER, model.buffers[i].data.size(), model.buffers[i].data.data(), 0);
+  }
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  return bufferObjects;
+}
+
+std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
+  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) {
+
+  std::vector<GLuint> vertexArrayObjects; // will be stack VAO for each mesh and primitives in this vector
+
+  meshVAOInfos.resize(model.meshes.size()); // one VAO info struct for each meshes
+
+  for (size_t i = 0; i < model.meshes.size(); ++i) {
+    const tinygltf::Mesh &mesh = model.meshes[i];
+    VaoRange& vaoRange = meshVAOInfos[i];
+    vaoRange.begin = static_cast<GLsizei>(vertexArrayObjects.size());
+    vaoRange.count = static_cast<GLsizei>(mesh.primitives.size());
+
+    vertexArrayObjects.resize(vertexArrayObjects.size() + mesh.primitives.size()); // extend size for this mesh primitives count
+
+    glGenVertexArrays(vaoRange.count, &vertexArrayObjects[vaoRange.begin]); // gen Vertex arrays for our new mesh primitives
+
+    for (size_t primitiveIdx = 0; primitiveIdx < mesh.primitives.size(); ++primitiveIdx) { // for each primitives
+      const GLuint vao = vertexArrayObjects[vaoRange.begin + primitiveIdx];
+      const tinygltf::Primitive &primitive = mesh.primitives[primitiveIdx];
+      glBindVertexArray(vao);
+
+      for(const auto &attributInfos : attributesNamesAndIndex) { // for each attributs
+
+        const std::string attributName = attributInfos.first;
+        const GLuint attributIdx = attributInfos.second;
+
+        const auto iterator = primitive.attributes.find(attributName);
+        if (iterator != end(primitive.attributes)) {
+          const size_t accessorIdx = (*iterator).second;
+          const tinygltf::Accessor &accessor = model.accessors[accessorIdx];
+          const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+          const size_t bufferIdx = bufferView.buffer;
+
+          glEnableVertexAttribArray(attributIdx);
+          assert(GL_ARRAY_BUFFER == bufferView.target); // check target
+          glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[bufferIdx]); // bind to our previous generated buffer Object
+        
+          const size_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
+          // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glVertexAttribPointer.xhtml
+          glVertexAttribPointer(attributIdx, accessor.type, accessor.componentType, GL_FALSE,
+          static_cast<GLsizei>(bufferView.byteStride), (const GLvoid *)byteOffset);
+        } else {
+          std::cout << "Unknown attribut \"" << attributName <<  "\" in mesh " << mesh.name << "." << std::endl;
+        }
+      } // end attributs
+
+      if (primitive.indices >= 0) { // bind indices if needed
+        const size_t accessorIdx = primitive.indices;
+        const tinygltf::Accessor &accessor = model.accessors[accessorIdx];
+        const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+        const size_t bufferIdx = bufferView.buffer;
+
+        assert(GL_ELEMENT_ARRAY_BUFFER == bufferView.target); // check target
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferObjects[bufferIdx]);
+      }
+
+    } // end mesh primitives
+  } // end meshs
+
+  glBindVertexArray(0); // unbind vertex array safety
+
+  std::cout << "Number of VAOs: " << vertexArrayObjects.size() << std::endl;
+
+  return vertexArrayObjects;
 }
