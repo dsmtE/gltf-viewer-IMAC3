@@ -23,8 +23,7 @@ void keyCallback(
   }
 }
 
-int ViewerApplication::run()
-{
+int ViewerApplication::run() {
   // Loader shaders
   const GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
 
@@ -32,28 +31,31 @@ int ViewerApplication::run()
   const GLint modelViewMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uModelViewMatrix");
   const GLint normalMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uNormalMatrix");
 
-  // Build projection matrix
-  auto maxDistance = 500.f; // TODO use scene bounds instead to compute this
-  maxDistance = maxDistance > 0.f ? maxDistance : 100.f;
-  const auto projMatrix =
-      glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,
-          0.001f * maxDistance, 1.5f * maxDistance);
-
-  // TODO Implement a new CameraController model and use it instead. Propose the
-  // choice from the GUI
-  FirstPersonCameraController cameraController{
-      m_GLFWHandle.window(), 0.5f * maxDistance};
-  if (m_hasUserCamera) {
-    cameraController.setCamera(m_userCamera);
-  } else {
-    // TODO Use scene bounds to compute a better default camera
-    cameraController.setCamera(
-        Camera{glm::vec3(0, 0, 0), glm::vec3(0, 0, -1), glm::vec3(0, 1, 0)});
-  }
-
+  // load model
   tinygltf::Model model;
   bool loadModel = loadGltfFile(model);
   if (!loadModel) { return -1; }
+
+  // Compute model bbox
+  glm::vec3 bboxMin, bboxMax;
+  computeSceneBounds(model, bboxMin, bboxMax);
+  const glm::vec3 diag = bboxMax - bboxMin;
+  const float maxDistance = glm::length(diag);
+
+  // Build projection matrix
+  const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
+
+  // TODO Implement a new CameraController model and use it instead. Propose the
+  // choice from the GUI
+  FirstPersonCameraController cameraController{m_GLFWHandle.window(), 0.3f * maxDistance};
+  if (m_hasUserCamera) {
+    cameraController.setCamera(m_userCamera);
+  } else {
+    const glm::vec3 up = glm::vec3(0, 1, 0);
+    const glm::vec3 center = 0.5f * (bboxMax + bboxMin);
+    const glm::vec3 eye = diag.z > 0 ? center + diag * 0.6f : center + 2.f * glm::cross(diag, up);
+    cameraController.setCamera(Camera{eye, center, up});
+  }
 
   const std::vector<GLuint> bufferObjects = createBufferObjects(model);
 
