@@ -9,6 +9,7 @@
 #include <glm/gtx/io.hpp>
 
 #include "utils/cameras.hpp"
+#include "utils/gltf.hpp"
 
 #include <stb_image_write.h>
 #include <tiny_gltf.h>
@@ -24,15 +25,11 @@ void keyCallback(
 int ViewerApplication::run()
 {
   // Loader shaders
-  const auto glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader,
-      m_ShadersRootPath / m_fragmentShader});
+  const GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
 
-  const auto modelViewProjMatrixLocation =
-      glGetUniformLocation(glslProgram.glId(), "uModelViewProjMatrix");
-  const auto modelViewMatrixLocation =
-      glGetUniformLocation(glslProgram.glId(), "uModelViewMatrix");
-  const auto normalMatrixLocation =
-      glGetUniformLocation(glslProgram.glId(), "uNormalMatrix");
+  const GLint modelViewProjMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uModelViewProjMatrix");
+  const GLint modelViewMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uModelViewMatrix");
+  const GLint normalMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uNormalMatrix");
 
   // Build projection matrix
   auto maxDistance = 500.f; // TODO use scene bounds instead to compute this
@@ -71,7 +68,7 @@ int ViewerApplication::run()
   glslProgram.use();
 
   // Lambda function to draw the scene
-  const auto drawScene = [&](const Camera &camera) {
+  const std::function<void(const Camera &)> drawScene = [&](const Camera &camera) {
     glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -79,15 +76,58 @@ int ViewerApplication::run()
 
     // The recursive function that should draw a node
     // We use a std::function because a simple lambda cannot be recursive
-    const std::function<void(int, const glm::mat4 &)> drawNode =
-        [&](int nodeIdx, const glm::mat4 &parentMatrix) {
-          // TODO The drawNode function
-        };
+    const std::function<void(int, const glm::mat4 &)> drawNode = [&](int nodeIdx, const glm::mat4 &parentMatrix) {
+      const tinygltf::Node& node = model.nodes[nodeIdx];
+      const glm::mat4 modelMatrix = getLocalToWorldMatrix(node, parentMatrix);
 
-    // Draw the scene referenced by gltf file
-    if (model.defaultScene >= 0) {
-      // TODO Draw all nodes
+      // If is actually a mesh (not a camera or a light)
+      if (node.mesh >= 0) {
+        const tinygltf::Mesh& mesh = model.meshes[node.mesh];
+        const VaoRange& meshVAOInfo = meshVAOInfos[node.mesh];
+
+        // compute matrix
+        const glm::mat4 mvMatrix = viewMatrix * modelMatrix;
+        const glm::mat4 mvpMatrix = projMatrix * mvMatrix;
+        const glm::mat4 normalMatrix = glm::transpose(glm::inverse(mvMatrix));
+
+        // send matrix as uniforms
+        glUniformMatrix4fv(modelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+        glUniformMatrix4fv(modelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
+        glUniformMatrix4fv(normalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+
+        // iterate over primitives
+        for (size_t i = 0; i < mesh.primitives.size(); ++i) {
+          // bind primitives vao
+          const GLuint vao = vertexArrayObjects[meshVAOInfo.begin + i];
+          glBindVertexArray(vao);
+
+          const tinygltf::Primitive& primitive = mesh.primitives[i];
+          
+          if (primitive.indices >= 0) { // if this primitive uses indices
+            const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
+            const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
+            const size_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
+
+            glDrawElements(primitive.mode, GLsizei(accessor.count), accessor.componentType, (const GLvoid*)byteOffset);
+
+          } else {
+            const int accessorIdx = (*std::begin(primitive.attributes)).second;
+            const tinygltf::Accessor& accessor = model.accessors[accessorIdx];
+            glDrawArrays(primitive.mode, 0, GLsizei(accessor.count));
+          }
+        }
+      }
+
+      for (const int childNodeIdx : node.children) // Draw children nodes
+        drawNode(childNodeIdx, modelMatrix);
+    };
+
+    if (model.defaultScene >= 0) { // Draw the scene referenced by gltf file
+      for (const int nodeIdx : model.scenes[model.defaultScene].nodes) { // iterate over all main nodes
+        drawNode(nodeIdx, glm::mat4(1));
+      }
     }
+    
   };
 
   // Loop until the user closes the window
