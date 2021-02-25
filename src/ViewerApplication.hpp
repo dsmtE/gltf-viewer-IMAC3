@@ -7,10 +7,19 @@
 
 #include <tiny_gltf.h>
 
+#include "enum.h"
+
 struct VaoRange {
   GLsizei begin; // Index of first element in vertexArrayObjects
   GLsizei count; // Number of elements in range
 };
+
+// enum ECameraType {
+//   Trackball,
+//   FirstPerson
+// };
+
+BETTER_ENUM(EControllerType, int, Trackball, FirstPerson)
 
 class ViewerApplication
 {
@@ -39,15 +48,15 @@ private:
 
   bool m_hasUserCamera = false;
   Camera m_userCamera;
+  int cameraControllerType = static_cast<int>(EControllerType::Trackball);
 
   fs::path m_OutputPath;
 
   // Order is important here, see comment below
   const std::string m_ImGuiIniFilename;
   // Last to be initialized, first to be destroyed:
-  GLFWHandle m_GLFWHandle{int(m_nWindowWidth), int(m_nWindowHeight),
-      "glTF Viewer",
-      m_OutputPath.empty()}; // show the window only if m_OutputPath is empty
+  // show the window only if m_OutputPath is empty
+  GLFWHandle m_GLFWHandle{int(m_nWindowWidth), int(m_nWindowHeight), "glTF Viewer", m_OutputPath.empty()};
   /*
     ! THE ORDER OF DECLARATION OF MEMBER VARIABLES IS IMPORTANT !
     - m_ImGuiIniFilename.c_str() will be used by ImGUI in ImGui::Shutdown, which

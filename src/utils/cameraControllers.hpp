@@ -12,16 +12,17 @@ class CameraController {
 protected:
   GLFWwindow *pWindow_ = nullptr;
   float fSpeed_ = 0.f;
+  float sensitivity_ = 0.01f;
   glm::vec3 worldUpAxis_;
 
   // Input event state
-  bool leftButtonPressed_ = false;
+  bool middleButtonPressed_ = false;
   glm::dvec2 lastCursorPosition_;
 
   Camera camera_;
 
 public:
-  CameraController(GLFWwindow *window,  float speed = 0.1f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
+  CameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.01f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
   virtual ~CameraController() {};
 
   // Setters
@@ -39,6 +40,8 @@ public:
     fSpeed_ = glm::max(fSpeed_, 0.f);
   }
 
+  glm::dvec2 getCursorDelta();
+
   // Update the view matrix based on input events and elapsed time
   // Return true if the view matrix has been modified
   virtual bool update(const float elapsedTime) = 0;
@@ -46,7 +49,7 @@ public:
 
 class FirstPersonCameraController : public CameraController {
 public:
-  FirstPersonCameraController(GLFWwindow *window, float speed = 0.1f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
+  FirstPersonCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.001f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
 
   bool update(const float elapsedTime) override;
 };
@@ -55,7 +58,7 @@ public:
 class TrackballCameraController: public CameraController {
 public:
 
-  TrackballCameraController(GLFWwindow *window, float speed = 0.1f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
+  TrackballCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.001f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
 
-  bool update(const float elapsedTime);
+  bool update(const float elapsedTime) override;
 };

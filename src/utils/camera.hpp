@@ -13,15 +13,13 @@ private:
 public:
   Camera() = default;
 
-  Camera(const glm::vec3& e,  const glm::vec3& c, const glm::vec3& u);
+  Camera(const glm::vec3& e, const glm::vec3& c, const glm::vec3& u);
 
   glm::mat4 getViewMatrix() const { return glm::lookAt(eye_, center_, up_); }
 
   // Move the camera along its left axis.
   void truckLeft(float offset);
-
   void pedestalUp(float offset);
-
   void dollyIn(float offset);
 
   void moveLocal(float truckLeftOffset, float pedestalUpOffset, float dollyIn);
@@ -38,8 +36,11 @@ public:
   void rotateWorld(float radians, const glm::vec3 &axis);
 
   inline const glm::vec3 eye() const { return eye_; }
+  inline glm::vec3& eye() { return eye_; }
   inline const glm::vec3 center() const { return center_; }
+  inline glm::vec3& center() { return center_; }
   inline const glm::vec3 up() const { return up_; }
+  inline glm::vec3& up() { return up_; }
 
   const glm::vec3 front(const bool normalize = true) const;
 

@@ -42,15 +42,15 @@ int ViewerApplication::run() {
   // Build projection matrix
   const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
 
-  FirstPersonCameraController cameraController(m_GLFWHandle.window(), 0.3f * maxDistance);
+  std::unique_ptr<CameraController> cameraController = std::make_unique<TrackballCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
 
   if (m_hasUserCamera) {
-    cameraController.setCamera(m_userCamera);
+    cameraController->setCamera(m_userCamera);
   } else {
     const glm::vec3 up = glm::vec3(0, 1, 0);
     const glm::vec3 center = 0.5f * (bboxMax + bboxMin);
     const glm::vec3 eye = diag.z > 0 ? center + diag * 0.6f : center + 2.f * glm::cross(diag, up);
-    cameraController.setCamera(Camera{eye, center, up});
+    cameraController->setCamera(Camera{eye, center, up});
   }
 
   const std::vector<GLuint> bufferObjects = createBufferObjects(model);
@@ -134,7 +134,7 @@ int ViewerApplication::run() {
     const GLsizei numComponents = 3;
     std::vector<unsigned char> pixels(m_nWindowWidth * m_nWindowHeight * numComponents);
     renderToImage(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), [&]() {
-      drawScene(cameraController.getCamera());
+      drawScene(cameraController->getCamera());
     });
 
     // flip the Y axis for image formats convention
@@ -149,7 +149,7 @@ int ViewerApplication::run() {
   for (size_t iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount) {
     const double seconds = glfwGetTime();
 
-    const Camera camera = cameraController.getCamera();
+    const Camera camera = cameraController->getCamera();
     drawScene(camera);
 
     // GUI code:
@@ -181,12 +181,9 @@ int ViewerApplication::run() {
 
     glfwPollEvents(); // Poll for and process events
 
-    auto ellapsedTime = glfwGetTime() - seconds;
-    auto guiHasFocus =
-        ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard;
-    if (!guiHasFocus) {
-      cameraController.update(float(ellapsedTime));
-    }
+    const double ellapsedTime = glfwGetTime() - seconds;
+    const bool guiHasFocus = ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard;
+    if (!guiHasFocus) { cameraController->update(float(ellapsedTime)); }
 
     m_GLFWHandle.swapBuffers(); // Swap front and back buffers
   }
@@ -225,9 +222,8 @@ ViewerApplication::ViewerApplication(const fs::path &appPath, uint32_t width,
     m_fragmentShader = fragmentShader;
   }
 
-  ImGui::GetIO().IniFilename =
-      m_ImGuiIniFilename.c_str(); // At exit, ImGUI will store its windows
-                                  // positions in this file
+  // At exit, ImGUI will store its windows positions in this file
+  ImGui::GetIO().IniFilename = m_ImGuiIniFilename.c_str(); 
 
   glfwSetKeyCallback(m_GLFWHandle.window(), keyCallback);
 
