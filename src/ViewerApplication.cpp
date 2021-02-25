@@ -8,16 +8,13 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
 
-#include "utils/cameras.hpp"
 #include "utils/gltf.hpp"
 #include "utils/images.hpp"
 
 #include <stb_image_write.h>
 #include <tiny_gltf.h>
 
-void keyCallback(
-    GLFWwindow *window, int key, int scancode, int action, int mods)
-{
+void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
     glfwSetWindowShouldClose(window, 1);
   }
@@ -45,9 +42,8 @@ int ViewerApplication::run() {
   // Build projection matrix
   const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
 
-  // TODO Implement a new CameraController model and use it instead. Propose the
-  // choice from the GUI
-  FirstPersonCameraController cameraController{m_GLFWHandle.window(), 0.3f * maxDistance};
+  FirstPersonCameraController cameraController(m_GLFWHandle.window(), 0.3f * maxDistance);
+
   if (m_hasUserCamera) {
     cameraController.setCamera(m_userCamera);
   } else {

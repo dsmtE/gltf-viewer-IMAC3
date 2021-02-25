@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utils/GLFWHandle.hpp"
-#include "utils/cameras.hpp"
+#include "utils/cameraControllers.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/shaders.hpp"
 
