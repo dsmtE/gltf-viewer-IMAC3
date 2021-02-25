@@ -58,6 +58,10 @@ int ViewerApplication::run() {
   std::vector<VaoRange> meshVAOInfos;
   std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos);
 
+  // light parameters
+  glm::vec3 lightDirection(1, 1, 1);
+  glm::vec3 lightIntensity(1, 1, 1);
+
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
   glslProgram.use();
@@ -89,6 +93,10 @@ int ViewerApplication::run() {
         glslProgram.setMat4("uModelViewProjMatrix", mvpMatrix);
         glslProgram.setMat4("uModelViewMatrix", mvMatrix);
         glslProgram.setMat4("uNormalMatrix", normalMatrix);
+
+        // view space conversion of lightDirection
+        glslProgram.setVec3f("uLightDirection", glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
+        glslProgram.setVec3f("uLightIntensity", lightIntensity);
 
         // iterate over primitives
         for (size_t i = 0; i < mesh.primitives.size(); ++i) {

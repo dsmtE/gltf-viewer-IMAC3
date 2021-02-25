@@ -12,8 +12,7 @@ uniform mat4 uModelViewProjMatrix;
 uniform mat4 uModelViewMatrix;
 uniform mat4 uNormalMatrix;
 
-void main()
-{
+void main() {
     vViewSpacePosition = vec3(uModelViewMatrix * vec4(aPosition, 1));
 	vViewSpaceNormal = normalize(vec3(uNormalMatrix * vec4(aNormal, 0)));
 	vTexCoords = aTexCoords;
