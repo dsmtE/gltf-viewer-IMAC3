@@ -202,45 +202,56 @@ public:
       return uniformLocationCache_[uniformName];
     }
 
-    GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
+    const GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
 
-      if (location ==  -1) {
-        std::cerr << "[Shader] uniform \"" << uniformName << "\" doesn't exist !" << std::endl;
-      }
+    if(location == -1) {
+      std::cerr << "[Shader] uniform \"" << uniformName << "\" doesn't exist or is not used !" << std::endl;
+      return -1;
+    }
 
     uniformLocationCache_[uniformName] = location;
     return location;
   }
 
   void setInt(const std::string& uniformName, int v) {
-    glUniform1i(getUniform(uniformName), v);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform1i(loc, v);
   }
   void setFloat(const std::string& uniformName, float v) {
-    glUniform1f(getUniform(uniformName), v);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform1f(loc, v);
   }
   void setVec2f(const std::string& uniformName, const glm::vec2& v) {
-    glUniform2f(getUniform(uniformName), v.x, v.y);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform2f(loc, v.x, v.y);
   }
   void setVec2f(const std::string& uniformName, const float& x, const float& y) {
-    glUniform2f(getUniform(uniformName), x, y);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform2f(loc, x, y);
   }
   void setVec3f(const std::string& uniformName, const glm::vec3& v) {
-    glUniform3f(getUniform(uniformName), v.x, v.y, v.z);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform3f(loc, v.x, v.y, v.z);
   }
   void setVec3f(const std::string& uniformName, const float& x, const float& y, const float& z) {
-    glUniform3f(getUniform(uniformName), x, y, z);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform3f(loc, x, y, z);
   }
   void setVec4f(const std::string& uniformName, const glm::vec4& v) {
-    glUniform4f(getUniform(uniformName), v.x, v.y, v.z, v.w);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform4f(loc, v.x, v.y, v.z, v.w);
   }
   void setVec4f(const std::string& uniformName, const float& x, const float& y, const float& z, const float& w) {
-    glUniform4f(getUniform(uniformName), x, y, z, w);
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform4f(loc, x, y, z, w);
   }
   void setMat3(const std::string& uniformName, const glm::mat3& m) {
-    glUniformMatrix3fv(getUniform(uniformName), 1, GL_FALSE, glm::value_ptr(m));
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m));
   }
   void setMat4(const std::string& uniformName, const glm::mat4& m) {
-    glUniformMatrix4fv(getUniform(uniformName), 1, GL_FALSE, glm::value_ptr(m));
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m));
   }
 
 };
