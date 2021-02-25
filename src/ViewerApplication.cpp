@@ -22,11 +22,7 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
 int ViewerApplication::run() {
   // Loader shaders
-  const GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
-
-  const GLint modelViewProjMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uModelViewProjMatrix");
-  const GLint modelViewMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uModelViewMatrix");
-  const GLint normalMatrixLocation = glGetUniformLocation(glslProgram.glId(), "uNormalMatrix");
+  GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
 
   // load model
   tinygltf::Model model;
@@ -90,9 +86,9 @@ int ViewerApplication::run() {
         const glm::mat4 normalMatrix = glm::transpose(glm::inverse(mvMatrix));
 
         // send matrix as uniforms
-        glUniformMatrix4fv(modelViewProjMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvpMatrix));
-        glUniformMatrix4fv(modelViewMatrixLocation, 1, GL_FALSE, glm::value_ptr(mvMatrix));
-        glUniformMatrix4fv(normalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+        glslProgram.setMat4("uModelViewProjMatrix", mvpMatrix);
+        glslProgram.setMat4("uModelViewMatrix", mvMatrix);
+        glslProgram.setMat4("uNormalMatrix", normalMatrix);
 
         // iterate over primitives
         for (size_t i = 0; i < mesh.primitives.size(); ++i) {

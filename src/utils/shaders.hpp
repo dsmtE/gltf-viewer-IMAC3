@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <glm/gtc/type_ptr.hpp>
+
 class GLShader
 {
   GLuint m_GLId;
@@ -131,6 +133,7 @@ class GLProgram
 {
   GLuint m_GLId;
   typedef std::unique_ptr<char[]> CharBuffer;
+  std::unordered_map<std::string, GLint> uniformLocationCache_;
 
 public:
   GLProgram() : m_GLId(glCreateProgram()) {}
@@ -184,22 +187,62 @@ public:
 
   void use() const { glUseProgram(m_GLId); }
 
-  GLint getUniformLocation(const GLchar *name) const
-  {
-    GLint location = glGetUniformLocation(m_GLId, name);
-    return location;
-  }
-
-  GLint getAttribLocation(const GLchar *name) const
-  {
+  GLint getAttribLocation(const GLchar *name) const{
     GLint location = glGetAttribLocation(m_GLId, name);
     return location;
   }
 
-  void bindAttribLocation(GLuint index, const GLchar *name) const
-  {
+  void bindAttribLocation(GLuint index, const GLchar *name) const{
     glBindAttribLocation(m_GLId, index, name);
   }
+
+  //---------- Uniform ----------//
+  GLint getUniform(const std::string &uniformName) {
+    if (uniformLocationCache_.find(uniformName) != uniformLocationCache_.end()) {
+      return uniformLocationCache_[uniformName];
+    }
+
+    GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
+
+      if (location ==  -1) {
+        std::cerr << "[Shader] uniform \"" << uniformName << "\" doesn't exist !" << std::endl;
+      }
+
+    uniformLocationCache_[uniformName] = location;
+    return location;
+  }
+
+  void setInt(const std::string& uniformName, int v) {
+    glUniform1i(getUniform(uniformName), v);
+  }
+  void setFloat(const std::string& uniformName, float v) {
+    glUniform1f(getUniform(uniformName), v);
+  }
+  void setVec2f(const std::string& uniformName, const glm::vec2& v) {
+    glUniform2f(getUniform(uniformName), v.x, v.y);
+  }
+  void setVec2f(const std::string& uniformName, const float& x, const float& y) {
+    glUniform2f(getUniform(uniformName), x, y);
+  }
+  void setVec3f(const std::string& uniformName, const glm::vec3& v) {
+    glUniform3f(getUniform(uniformName), v.x, v.y, v.z);
+  }
+  void setVec3f(const std::string& uniformName, const float& x, const float& y, const float& z) {
+    glUniform3f(getUniform(uniformName), x, y, z);
+  }
+  void setVec4f(const std::string& uniformName, const glm::vec4& v) {
+    glUniform4f(getUniform(uniformName), v.x, v.y, v.z, v.w);
+  }
+  void setVec4f(const std::string& uniformName, const float& x, const float& y, const float& z, const float& w) {
+    glUniform4f(getUniform(uniformName), x, y, z, w);
+  }
+  void setMat3(const std::string& uniformName, const glm::mat3& m) {
+    glUniformMatrix3fv(getUniform(uniformName), 1, GL_FALSE, glm::value_ptr(m));
+  }
+  void setMat4(const std::string& uniformName, const glm::mat4& m) {
+    glUniformMatrix4fv(getUniform(uniformName), 1, GL_FALSE, glm::value_ptr(m));
+  }
+
 };
 
 inline GLProgram buildProgram(std::initializer_list<GLShader> shaders)
