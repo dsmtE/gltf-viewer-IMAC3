@@ -173,6 +173,27 @@ int ViewerApplication::run() {
              << camera.up().x << "," << camera.up().y << "," << camera.up().z;
           glfwSetClipboardString(m_GLFWHandle.window(), ss.str().c_str());
         }
+
+        bool ImGuiControllerType = false;
+        for (EControllerType c : EControllerType::_values())
+          ImGuiControllerType |= ImGui::RadioButton(c._to_string(), &cameraControllerType, c._to_integral());
+
+        if (ImGuiControllerType) {
+          const Camera currentCamera = cameraController->getCamera();
+          
+          switch (cameraControllerType) {
+          case static_cast<int>(EControllerType::Trackball) :
+            cameraController = std::make_unique<TrackballCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
+            break;
+          case static_cast<int>(EControllerType::FirstPerson) :
+            cameraController = std::make_unique<FirstPersonCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
+            break;
+          
+          default:
+            break;
+          }
+          cameraController->setCamera(currentCamera);
+        }
       }
       ImGui::End();
     }
