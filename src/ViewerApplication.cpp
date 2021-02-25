@@ -60,6 +60,7 @@ int ViewerApplication::run() {
 
   // light parameters
   glm::vec3 lightDirection(1, 1, 1);
+  bool lightFromCamera = false;
   glm::vec3 lightColor(1.f, 1.f, 1.f);
   float lightIntensity = 1.f;
 
@@ -100,7 +101,7 @@ int ViewerApplication::run() {
         glslProgram.setMat4("uNormalMatrix", normalMatrix);
 
         // view space conversion of lightDirection
-        glslProgram.setVec3f("uLightDirection", glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
+        glslProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
         glslProgram.setVec3f("uLightColor", lightColor);
         glslProgram.setFloat("uLightIntensity", lightIntensity);
 
@@ -213,6 +214,7 @@ int ViewerApplication::run() {
 
           ImGui::ColorEdit3("color", (float *)&lightColor);
           ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
+          ImGui::Checkbox("light from camera", &lightFromCamera);
       }
 
       }
