@@ -49,7 +49,7 @@ public:
 
 class FirstPersonCameraController : public CameraController {
 public:
-  FirstPersonCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.001f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
+  FirstPersonCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.01f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
 
   bool update(const float elapsedTime) override;
 };
@@ -58,7 +58,7 @@ public:
 class TrackballCameraController: public CameraController {
 public:
 
-  TrackballCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.001f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
+  TrackballCameraController(GLFWwindow *window, const float speed = 0.1f, const float sensitivity = 0.01f, const glm::vec3 &worldUpAxis = glm::vec3(0, 1, 0));
 
   bool update(const float elapsedTime) override;
 };
