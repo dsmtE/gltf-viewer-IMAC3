@@ -60,7 +60,12 @@ int ViewerApplication::run() {
 
   // light parameters
   glm::vec3 lightDirection(1, 1, 1);
-  glm::vec3 lightIntensity(1, 1, 1);
+  glm::vec3 lightColor(1.f, 1.f, 1.f);
+  float lightIntensity = 1.f;
+
+  // used with imgui to recompute LightDir
+  float lightTheta = 0.f;
+  float lightPhi = 0.f;
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
@@ -96,7 +101,8 @@ int ViewerApplication::run() {
 
         // view space conversion of lightDirection
         glslProgram.setVec3f("uLightDirection", glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
-        glslProgram.setVec3f("uLightIntensity", lightIntensity);
+        glslProgram.setVec3f("uLightColor", lightColor);
+        glslProgram.setFloat("uLightIntensity", lightIntensity);
 
         // iterate over primitives
         for (size_t i = 0; i < mesh.primitives.size(); ++i) {
@@ -198,6 +204,17 @@ int ViewerApplication::run() {
           }
           cameraController->setCamera(currentCamera);
         }
+
+        if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+          if (ImGui::SliderFloat("theta", &lightTheta, 0, glm::pi<float>()) || ImGui::SliderFloat("phi", &lightPhi, 0, 2.f * glm::pi<float>())) {
+            // update lightDirection
+            lightDirection = glm::vec3(glm::sin(lightTheta) * glm::cos(lightPhi), glm::cos(lightTheta), glm::sin(lightTheta) * glm::sin(lightPhi));
+          }
+
+          ImGui::ColorEdit3("color", (float *)&lightColor);
+          ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
+      }
+
       }
       ImGui::End();
     }
