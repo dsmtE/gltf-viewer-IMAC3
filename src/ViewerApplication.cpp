@@ -10,6 +10,7 @@
 
 #include "utils/gltf.hpp"
 #include "utils/images.hpp"
+#include "utils/Texture.hpp"
 
 #include <stb_image_write.h>
 #include <tiny_gltf.h>
@@ -49,6 +50,7 @@ int ViewerApplication::run() {
     cameraController->setCamera(Camera{eye, center, up});
   }
 
+  // gltf loading
   const std::vector<GLuint> bufferObjects = createBufferObjects(model);
 
   const std::vector<std::pair<std::string, GLuint>> attributesNamesAndIndex = {{
@@ -58,6 +60,14 @@ int ViewerApplication::run() {
   std::vector<VaoRange> meshVAOInfos;
   std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos);
 
+  const std::vector<Texture> textureObjects = createTextureObjects(model);
+
+  // Create white texture for object with no base color texture
+  Texture whiteTexture;
+  whiteTexture.genTexture(GL_LINEAR, GL_REPEAT);
+  float white[] = {1, 1, 1, 1};
+  whiteTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
+  
   // light parameters
   glm::vec3 lightDirection(1, 1, 1);
   bool lightFromCamera = false;
@@ -290,7 +300,7 @@ bool ViewerApplication::loadGltfFile(tinygltf::Model &model) {
   return ret;
 }
 
-std::vector<GLuint> ViewerApplication::createBufferObjects(const tinygltf::Model &model) {
+std::vector<GLuint> ViewerApplication::createBufferObjects(const tinygltf::Model &model) const {
   std::vector<GLuint> bufferObjects(model.buffers.size(), 0);
 
   glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data());
@@ -304,8 +314,36 @@ std::vector<GLuint> ViewerApplication::createBufferObjects(const tinygltf::Model
   return bufferObjects;
 }
 
+std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Model &model) const {
+  std::vector<Texture> textureObjects(model.textures.size());
+
+  tinygltf::Sampler defaultSampler;
+  defaultSampler.minFilter = GL_LINEAR;
+  defaultSampler.magFilter = GL_LINEAR;
+  defaultSampler.wrapS = GL_REPEAT;
+  defaultSampler.wrapT = GL_REPEAT;
+  defaultSampler.wrapR = GL_REPEAT;
+
+  glActiveTexture(GL_TEXTURE0);
+
+  for (size_t i = 0; i < model.textures.size(); ++i) { // foreach model texture
+    Texture& texture = textureObjects[i];
+    const tinygltf::Texture& modelTexture = model.textures[i];
+    assert(modelTexture.source >= 0);
+    const tinygltf::Image& image = model.images[modelTexture.source];
+    const tinygltf::Sampler& sampler = modelTexture.sampler >= 0 ? model.samplers[modelTexture.sampler] : defaultSampler;
+
+    texture.genTexture(sampler.minFilter != -1 ? sampler.minFilter : GL_LINEAR, {sampler.wrapS, sampler.wrapT, sampler.wrapR});
+    texture.upload(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data());
+  }
+
+  return textureObjects;
+}
+
+
+
 std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
-  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) {
+  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) const {
 
   std::vector<GLuint> vertexArrayObjects; // will be stack VAO for each mesh and primitives in this vector
 
