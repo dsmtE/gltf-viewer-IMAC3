@@ -64,7 +64,7 @@ int ViewerApplication::run() {
 
   // Create white texture for object with no base color texture
   Texture whiteTexture;
-  whiteTexture.genTexture(GL_LINEAR, GL_REPEAT);
+  whiteTexture.genTexture(GL_LINEAR, GL_LINEAR, GL_REPEAT);
   float white[] = {1, 1, 1, 1};
   whiteTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
   
@@ -324,8 +324,6 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
   defaultSampler.wrapT = GL_REPEAT;
   defaultSampler.wrapR = GL_REPEAT;
 
-  glActiveTexture(GL_TEXTURE0);
-
   for (size_t i = 0; i < model.textures.size(); ++i) { // foreach model texture
     Texture& texture = textureObjects[i];
     const tinygltf::Texture& modelTexture = model.textures[i];
@@ -333,7 +331,10 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
     const tinygltf::Image& image = model.images[modelTexture.source];
     const tinygltf::Sampler& sampler = modelTexture.sampler >= 0 ? model.samplers[modelTexture.sampler] : defaultSampler;
 
-    texture.genTexture(sampler.minFilter != -1 ? sampler.minFilter : GL_LINEAR, {sampler.wrapS, sampler.wrapT, sampler.wrapR});
+    texture.genTexture(sampler.minFilter != -1 ? sampler.minFilter : GL_LINEAR,
+                       sampler.magFilter != -1 ? sampler.magFilter : GL_LINEAR,
+                       {sampler.wrapS, sampler.wrapT, sampler.wrapR});
+
     texture.upload(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data());
   }
 

@@ -20,17 +20,17 @@ public:
 
 	// Creates an OpenGL texture. You are then responsible for destroying it.
     // The OpenGL ID of the texture.
-    static GLuint CreateTextureID(const GLint interpolationMode = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE});
-    static inline GLuint CreateTextureID(const GLint interpolationMode = GL_LINEAR, GLint wrapMode = GL_CLAMP_TO_EDGE) {
-        return CreateTextureID(interpolationMode, {wrapMode, wrapMode, wrapMode});
+    static GLuint CreateTextureID(const GLint minFilter  = GL_LINEAR, const GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE});
+    static inline GLuint CreateTextureID(const GLint minFilter  = GL_LINEAR, const GLint magFilter = GL_LINEAR, GLint wrapMode = GL_CLAMP_TO_EDGE) {
+        return CreateTextureID(minFilter, magFilter, {wrapMode, wrapMode, wrapMode});
     }
         
 	// Actually constructs the OpenGL texture.
 	// We don't do this in the constructor to allow the use of static textures (those would fail because OpenGL is only initialized once AppManager has been constructed)
-    void genTexture(const GLint interpolationMode = GL_LINEAR, const std::array<GLint, 3>& wrapSMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE});
+    void genTexture(const GLint minFilter  = GL_LINEAR, const GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapSMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE});
 
-    inline void genTexture(const GLint interpolationMode = GL_LINEAR, const GLint wrapMode = GL_CLAMP_TO_EDGE) {
-        genTexture(interpolationMode, {wrapMode, wrapMode, wrapMode});
+    inline void genTexture(const GLint minFilter  = GL_LINEAR, const GLint magFilter = GL_LINEAR, const GLint wrapMode = GL_CLAMP_TO_EDGE) {
+        genTexture(minFilter, magFilter, {wrapMode, wrapMode, wrapMode});
     }
 
 	// Upload the image data on the GPU (or just the size if you plan on writting on the texture through shaders).
@@ -49,9 +49,9 @@ public:
 
 	// Attaches your texture to a slot, so that it is ready to be read by a shader.
 	// This should match the "uniform sampler2D u_TextureSlot" in your shader that is set through setUniform1i(slot)
-	void attachToSlot(const int slot);
+	void attachToSlot(const int slot = 0) const;
 
-	inline GLuint ID() { return textureId_; }
+	inline GLuint ID() const { return textureId_; }
 };
 
 template <typename T>
