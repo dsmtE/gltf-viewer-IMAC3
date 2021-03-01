@@ -20,7 +20,6 @@ struct VaoRange {
 BETTER_ENUM(EControllerType, int, Trackball, FirstPerson)
 
 class ViewerApplication {
-{
 public:
   ViewerApplication(const fs::path &appPath, uint32_t width, uint32_t height,
       const fs::path &gltfFile, const std::vector<float> &lookatArgs,
@@ -32,7 +31,6 @@ public:
 private:
   // A range of indices in a vector containing Vertex Array Objects
   
-
   GLsizei m_nWindowWidth = 1280;
   GLsizei m_nWindowHeight = 720;
 
@@ -42,7 +40,7 @@ private:
 
   fs::path m_gltfFilePath;
   std::string m_vertexShader = "forward.vs.glsl";
-  std::string m_fragmentShader = "diffuse_directional_light.fs.glsl";
+  std::string m_fragmentShader = "pbr.fs.glsl";
 
   bool m_hasUserCamera = false;
   Camera m_userCamera;

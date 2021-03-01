@@ -89,14 +89,37 @@ int ViewerApplication::run() {
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
-  glslProgram.use();
+
+  const std::function<void(const int&)> bindMaterial = [&](const int materialIndex) {
+    // default whiteTexture and baseColor
+    const Texture* baseColTexture = &whiteTexture;
+    std::vector<float> baseColor = {1, 1, 1, 1};
+    
+    if (materialIndex >= 0) {
+      const tinygltf::Material& material = model.materials[materialIndex];
+      const tinygltf::PbrMetallicRoughness& pbrMetallicRoughness = material.pbrMetallicRoughness;
+
+      std::transform(pbrMetallicRoughness.baseColorFactor.begin(), pbrMetallicRoughness.baseColorFactor.end(), baseColor.begin(),
+        [](const double x) -> float { return static_cast<float>(x); });
+
+      if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
+        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
+        if (texture.source >= 0) { baseColTexture = &textureObjects[texture.source]; }
+      }
+    }
+
+    glslProgram.setVec4f("uBaseColorFactor", baseColor);
+    baseColTexture->attachToSlot(0);
+    glslProgram.setInt("uBaseColorTexture", 0);
+  };
 
   // Lambda function to draw the scene
   const std::function<void(const Camera &)> drawScene = [&](const Camera &camera) {
     glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    const auto viewMatrix = camera.getViewMatrix();
+    
+    glslProgram.use();
+    const glm::mat4 viewMatrix = camera.getViewMatrix();
 
     // The recursive function that should draw a node
     // We use a std::function because a simple lambda cannot be recursive
@@ -132,6 +155,8 @@ int ViewerApplication::run() {
 
           const tinygltf::Primitive& primitive = mesh.primitives[i];
           
+          bindMaterial(primitive.material);
+
           if (primitive.indices >= 0) { // if this primitive uses indices
             const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
             const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
