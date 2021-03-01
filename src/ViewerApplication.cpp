@@ -38,8 +38,17 @@ int ViewerApplication::run() {
 
   // Build projection matrix
   const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
+  
+  std::unique_ptr<CameraController> cameraController;
 
-  std::unique_ptr<CameraController> cameraController = std::make_unique<TrackballCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
+  switch (cameraControllerType_) {
+    case static_cast<int>(EControllerType::Trackball) :
+      cameraController = std::make_unique<TrackballCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
+    break;
+    case static_cast<int>(EControllerType::FirstPerson) :
+      cameraController = std::make_unique<FirstPersonCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
+    break;
+  }
 
   if (m_hasUserCamera) {
     cameraController->setCamera(m_userCamera);
@@ -149,7 +158,6 @@ int ViewerApplication::run() {
     }
     
   };
-
   
   if (!m_OutputPath.empty()) { // if output path provided
     const GLsizei numComponents = 3;
@@ -197,12 +205,12 @@ int ViewerApplication::run() {
 
         bool ImGuiControllerType = false;
         for (EControllerType c : EControllerType::_values())
-          ImGuiControllerType |= ImGui::RadioButton(c._to_string(), &cameraControllerType, c._to_integral());
+          ImGuiControllerType |= ImGui::RadioButton(c._to_string(), &cameraControllerType_, c._to_integral());
 
         if (ImGuiControllerType) {
           const Camera currentCamera = cameraController->getCamera();
           
-          switch (cameraControllerType) {
+          switch (cameraControllerType_) {
           case static_cast<int>(EControllerType::Trackball) :
             cameraController = std::make_unique<TrackballCameraController>(m_GLFWHandle.window(), 0.3f * maxDistance);
             break;
@@ -340,8 +348,6 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
 
   return textureObjects;
 }
-
-
 
 std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
   const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) const {

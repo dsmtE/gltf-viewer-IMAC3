@@ -19,7 +19,7 @@ struct VaoRange {
 
 BETTER_ENUM(EControllerType, int, Trackball, FirstPerson)
 
-class ViewerApplication
+class ViewerApplication {
 {
 public:
   ViewerApplication(const fs::path &appPath, uint32_t width, uint32_t height,
@@ -46,7 +46,7 @@ private:
 
   bool m_hasUserCamera = false;
   Camera m_userCamera;
-  int cameraControllerType = static_cast<int>(EControllerType::Trackball);
+  int cameraControllerType_ = static_cast<int>(EControllerType::FirstPerson);
 
   fs::path m_OutputPath;
 
