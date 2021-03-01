@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <cassert>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -204,10 +205,12 @@ public:
 
     const GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
 
+#ifndef NDEBUG
     if(location == -1) {
       std::cerr << "[Shader] uniform \"" << uniformName << "\" doesn't exist or is not used !" << std::endl;
       return -1;
     }
+#endif
 
     uniformLocationCache_[uniformName] = location;
     return location;
@@ -217,34 +220,63 @@ public:
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform1i(loc, v);
   }
+
   void setFloat(const std::string& uniformName, float v) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform1f(loc, v);
   }
+
   void setVec2f(const std::string& uniformName, const glm::vec2& v) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform2f(loc, v.x, v.y);
+  }
+  void setVec2f(const std::string& uniformName, const std::vector<float>& vec) {
+    assert(vec.size() >= 2);
+    setVec3f(uniformName, vec.data());
   }
   void setVec2f(const std::string& uniformName, const float& x, const float& y) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform2f(loc, x, y);
   }
+  void setVec2f(const std::string& uniformName, const float* data) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform2f(loc, data[0], data[1]);
+  }
+
   void setVec3f(const std::string& uniformName, const glm::vec3& v) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform3f(loc, v.x, v.y, v.z);
+  }
+  void setVec3f(const std::string& uniformName, const std::vector<float>& vec) {
+    assert(vec.size() >= 3);
+    setVec3f(uniformName, vec.data());
+  }
+  void setVec3f(const std::string& uniformName, const float* data) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform3f(loc, data[0], data[1], data[2]);
   }
   void setVec3f(const std::string& uniformName, const float& x, const float& y, const float& z) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform3f(loc, x, y, z);
   }
+
+  void setVec4f(const std::string& uniformName, const std::vector<float>& vec) {
+    assert(vec.size() >= 4);
+    setVec4f(uniformName, vec.data());
+  }
   void setVec4f(const std::string& uniformName, const glm::vec4& v) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform4f(loc, v.x, v.y, v.z, v.w);
+  }
+  void setVec4f(const std::string& uniformName, const float* data) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) glUniform4f(loc, data[0], data[1], data[2], data[3]);
   }
   void setVec4f(const std::string& uniformName, const float& x, const float& y, const float& z, const float& w) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniform4f(loc, x, y, z, w);
   }
+
   void setMat3(const std::string& uniformName, const glm::mat3& m) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m));
