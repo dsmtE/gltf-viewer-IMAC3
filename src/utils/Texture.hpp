@@ -37,15 +37,18 @@ public:
 	// An array of unsigned chars. You can leave as nullptr if you just want to set the size of the texture. 3 consecutive unsigned chars make a pixel (Red Green Blue).
 	// The OpenGL convention is that the first pixel in the array is the bottom-left of the image, then the second is on the first row second column and so on.
 	template <typename T>
-    void upload(const int width, const int height, const GLint internalformat, const GLenum format, const GLenum type, const T* data = nullptr);
-
-    inline void Texture::uploadRGB(int width, int height, unsigned char* data = nullptr) {
-        upload(width, height, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, data);
-    }
-
-    inline void Texture::uploadRGBA(int width, int height, unsigned char* data = nullptr) {
-        upload(width, height, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    }
+	void upload(const int width, const int height, const GLint internalformat, const GLenum format, const GLenum type, const T* data) {
+#ifndef NDEBUG
+		if (textureId_ == -1) {
+			std::cerr << "[Texture::upload] You haven't generated that texture yet !" << std::endl;
+			return;
+		}
+		dataUploaded_ = true;
+#endif
+		glBindTexture(GL_TEXTURE_2D, textureId_);
+		glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
 
 	// Attaches your texture to a slot, so that it is ready to be read by a shader.
 	// This should match the "uniform sampler2D u_TextureSlot" in your shader that is set through setUniform1i(slot)
@@ -54,15 +57,4 @@ public:
 	inline GLuint ID() const { return textureId_; }
 };
 
-template <typename T>
-void Texture::upload(const int width, const int height, const GLint internalformat, const GLenum format, const GLenum type, const T* data) {
-#ifndef NDEBUG
-	dataUploaded_ = true;
-	if (textureId_ == -1)
-		std::cerr << "[Texture::upload] You haven't generated that texture yet !" << std::endl;
-#endif
 
-	glBindTexture(GL_TEXTURE_2D, textureId_);
-	glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data);
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
