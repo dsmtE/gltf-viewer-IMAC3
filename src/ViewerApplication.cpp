@@ -69,7 +69,7 @@ int ViewerApplication::run() {
   std::vector<VaoRange> meshVAOInfos;
   std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos);
 
-  const std::vector<Texture> textureObjects = createTextureObjects(model);
+  std::vector<Texture> textureObjects = createTextureObjects(model);
 
   // Create white texture for object with no base color texture
   Texture whiteTexture;
@@ -91,9 +91,10 @@ int ViewerApplication::run() {
   glEnable(GL_DEPTH_TEST);
 
   const std::function<void(const int&)> bindMaterial = [&](const int materialIndex) {
-    // default whiteTexture and baseColor
-    const Texture* baseColTexture = &whiteTexture;
+    // default uniforms
     std::vector<float> baseColor = {1, 1, 1, 1};
+    float metallicFactor = 1;
+    float roughnessFactor = 1;
     
     if (materialIndex >= 0) {
       const tinygltf::Material& material = model.materials[materialIndex];
@@ -102,15 +103,41 @@ int ViewerApplication::run() {
       std::transform(pbrMetallicRoughness.baseColorFactor.begin(), pbrMetallicRoughness.baseColorFactor.end(), baseColor.begin(),
         [](const double x) -> float { return static_cast<float>(x); });
 
+      metallicFactor = static_cast<float>(pbrMetallicRoughness.metallicFactor);
+      roughnessFactor = static_cast<float>(pbrMetallicRoughness.roughnessFactor);
+
       if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
         const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
-        if (texture.source >= 0) { baseColTexture = &textureObjects[texture.source]; }
+        if (texture.source >= 0) {
+          const Texture& baseColorTexture = textureObjects[texture.source];
+
+          baseColorTexture.attachToSlot(0);
+          glslProgram.setInt("uBaseColorTexture", 0);
+          }
       }
+
+      if (pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
+        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.metallicRoughnessTexture.index];
+        if (texture.source >= 0) {
+          const Texture& metallicRoughnessTexture = textureObjects[texture.source];
+
+          metallicRoughnessTexture.attachToSlot(1);
+          glslProgram.setInt("uMetallicRoughnessTexture", 1);
+          }
+      }
+
+    }else {
+      whiteTexture.attachToSlot(0);
+      glslProgram.setInt("uBaseColorTexture", 0);
+
+      whiteTexture.attachToSlot(1);
+      glslProgram.setInt("uMetallicRoughnessTexture", 1);
     }
 
+    glslProgram.setFloat("uMetallicFactor", metallicFactor);
+    glslProgram.setFloat("uRoughnessFactor", roughnessFactor);
     glslProgram.setVec4f("uBaseColorFactor", baseColor);
-    baseColTexture->attachToSlot(0);
-    glslProgram.setInt("uBaseColorTexture", 0);
+
   };
 
   // Lambda function to draw the scene
@@ -373,6 +400,7 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
 
   return textureObjects;
 }
+
 
 std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
   const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) const {
