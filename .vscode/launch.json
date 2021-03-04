@@ -1,118 +1,92 @@
 {
   "version": "0.2.0",
   "configurations": [
-    // Windows debug configurations, for Visual Studio compiler:
     {
-      "name": "Debug (Windows)",
-      "type": "cppvsdbg",
-      "request": "launch",
-      "program": "build/bin/Debug/gltf-viewer.exe",
-      "args": [
-        ""
-      ],
-      "stopAtEntry": false,
-      "environment": [],
-      "console": "externalTerminal",
-      "cwd": "${workspaceRoot}",
-    },
-    {
-      "name": "Display Info (Windows)",
+      "name": "Display Info (Debug)",
       "type": "cppvsdbg",
       "request": "launch",
       "program": "build/bin/Debug/gltf-viewer.exe",
       "args": [
         "info"
       ],
-      "stopAtEntry": false,
+      "externalConsole": false,
       "environment": [],
-      "console": "externalTerminal",
+      "console": "integratedTerminal",
       "cwd": "${workspaceRoot}",
     },
     {
-      "name": "Viewer on Sponza (Windows)",
+      "name": "Viewer on Sponza (Debug)",
       "type": "cppvsdbg",
+      "linux": { "type": "cppdbg" },
       "request": "launch",
-      "program": "build/bin/Debug/gltf-viewer.exe",
+      "program": "build/bin/Debug/gltf-viewer",
       "args": [
         "viewer",
         "${workspaceFolder}/gltf-sample-models/2.0/Sponza/glTF/Sponza.gltf",
-        "--lookat",
-        "-5.26056,6.59932,0.85661,-4.40144,6.23486,0.497347,0.342113,0.931131,-0.126476"
       ],
-      "stopAtEntry": false,
+      "externalConsole": false,
       "environment": [],
-      "console": "externalTerminal",
+      "console": "integratedTerminal",
       "cwd": "${workspaceRoot}",
     },
     {
-      "name": "Viewer on Helmet (Windows)",
+      "name": "Viewer on Sponza (Release)",
       "type": "cppvsdbg",
+      "linux": { "type": "cppdbg" },
       "request": "launch",
-      "program": "build/bin/Debug/gltf-viewer.exe",
+      "program": "build/bin/Release/gltf-viewer",
+      "args": [
+        "viewer",
+        "${workspaceFolder}/gltf-sample-models/2.0/Sponza/glTF/Sponza.gltf",
+      ],
+      "externalConsole": false,
+      "environment": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceRoot}",
+    },
+    {
+      "name": "Viewer on Helmet (Debug)",
+      "type": "cppvsdbg",
+      "linux": { "type": "cppdbg" },
+      "request": "launch",
+      "program": "build/bin/Debug/gltf-viewer",
       "args": [
         "viewer",
         "${workspaceFolder}/gltf-sample-models/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf"
       ],
-      "stopAtEntry": false,
       "environment": [],
-      "console": "externalTerminal",
-      "cwd": "${workspaceRoot}",
-    },
-    // Linux debug configurations, for gcc compiler:
-    {
-      "name": "Debug (Linux)",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "build/bin/gltf-viewer",
-      "args": [
-        ""
-      ],
-      "stopAtEntry": false,
-      "environment": [],
-      "externalConsole": true,
+      "externalConsole": false,
+      "console": "integratedTerminal",
       "cwd": "${workspaceRoot}",
     },
     {
-      "name": "Display Info (Linux)",
-      "type": "cppdbg",
+      "name": "Viewer on Helmet (Release)",
+      "type": "cppvsdbg",
+      "linux": { "type": "cppdbg" },
       "request": "launch",
-      "program": "build/bin/gltf-viewer",
-      "args": [
-        "info"
-      ],
-      "stopAtEntry": false,
-      "environment": [],
-      "externalConsole": true,
-      "cwd": "${workspaceRoot}",
-    },
-    {
-      "name": "Viewer on Sponza (Linux)",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "build/bin/gltf-viewer",
-      "args": [
-        "viewer",
-        "${workspaceFolder}/gltf-sample-models/2.0/Sponza/glTF/Sponza.gltf",
-        "--lookat",
-        "-5.26056,6.59932,0.85661,-4.40144,6.23486,0.497347,0.342113,0.931131,-0.126476"
-      ],
-      "stopAtEntry": false,
-      "environment": [],
-      "externalConsole": true,
-      "cwd": "${workspaceRoot}",
-    },
-    {
-      "name": "Viewer on Helmet (Linux)",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "build/bin/gltf-viewer",
+      "program": "build/bin/Release/gltf-viewer",
       "args": [
         "viewer",
         "${workspaceFolder}/gltf-sample-models/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf"
       ],
-      "stopAtEntry": false,
       "environment": [],
-      "externalConsole": true,
+      "externalConsole": false,
+      "console": "integratedTerminal",
+      "cwd": "${workspaceRoot}",
+    },
+    {
+      "name": "Viewer on WaterBottle (Release)",
+      "type": "cppvsdbg",
+      "linux": { "type": "cppdbg" },
+      "request": "launch",
+      "program": "build/bin/Release/gltf-viewer",
+      "args": [
+        "viewer",
+        "${workspaceFolder}/gltf-sample-models/2.0/WaterBottle/glTF/WaterBottle.gltf"
+      ],
+      "environment": [],
+      "externalConsole": false,
+      "console": "integratedTerminal",
       "cwd": "${workspaceRoot}",
     },
   ]
