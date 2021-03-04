@@ -74,8 +74,13 @@ int ViewerApplication::run() {
   // Create white texture for object with no base color texture
   Texture whiteTexture;
   whiteTexture.genTexture(GL_LINEAR, GL_LINEAR, GL_REPEAT);
-  float white[] = {1, 1, 1, 1};
+  const float white[] = {1, 1, 1, 1};
   whiteTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
+
+  Texture blackTexture;
+  blackTexture.genTexture(GL_LINEAR, GL_LINEAR, GL_REPEAT);
+  const float black[] = {0, 0, 0, 1};
+  blackTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
   
   // light parameters
   glm::vec3 lightDirection(1, 1, 1);
@@ -92,26 +97,30 @@ int ViewerApplication::run() {
 
   const std::function<void(const int&)> bindMaterial = [&](const int materialIndex) {
     // default uniforms
-    std::vector<float> baseColor = {1, 1, 1, 1};
+    glm::vec4 baseColor(1);
     float metallicFactor = 1;
     float roughnessFactor = 1;
+    glm::vec3 emissiveFactor(0);
     
     if (materialIndex >= 0) {
       const tinygltf::Material& material = model.materials[materialIndex];
       const tinygltf::PbrMetallicRoughness& pbrMetallicRoughness = material.pbrMetallicRoughness;
 
-      std::transform(pbrMetallicRoughness.baseColorFactor.begin(), pbrMetallicRoughness.baseColorFactor.end(), baseColor.begin(),
-        [](const double x) -> float { return static_cast<float>(x); });
-
       metallicFactor = static_cast<float>(pbrMetallicRoughness.metallicFactor);
       roughnessFactor = static_cast<float>(pbrMetallicRoughness.roughnessFactor);
+
+      for (int i = 0; i < 4; i++)
+        baseColor[i] = static_cast<float>(pbrMetallicRoughness.baseColorFactor[i]);
+
+      for (int i = 0; i < 3; i++)
+        emissiveFactor[i] = static_cast<float>(material.emissiveFactor[i]);
 
       if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
         const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
         if (texture.source >= 0) {
-          const Texture& baseColorTexture = textureObjects[texture.source];
+          const Texture& textureObject = textureObjects[texture.source];
 
-          baseColorTexture.attachToSlot(0);
+          textureObject.attachToSlot(0);
           glslProgram.setInt("uBaseColorTexture", 0);
           }
       }
@@ -119,10 +128,20 @@ int ViewerApplication::run() {
       if (pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
         const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.metallicRoughnessTexture.index];
         if (texture.source >= 0) {
-          const Texture& metallicRoughnessTexture = textureObjects[texture.source];
+          const Texture& textureObject = textureObjects[texture.source];
 
-          metallicRoughnessTexture.attachToSlot(1);
+          textureObject.attachToSlot(1);
           glslProgram.setInt("uMetallicRoughnessTexture", 1);
+          }
+      }
+
+      if (material.emissiveTexture.index >= 0) {
+        const tinygltf::Texture& texture = model.textures[material.emissiveTexture.index];
+        if (texture.source >= 0) {
+          const Texture& textureObject = textureObjects[texture.source];
+
+          textureObject.attachToSlot(2);
+          glslProgram.setInt("uEmissiveTexture", 2);
           }
       }
 
@@ -130,14 +149,17 @@ int ViewerApplication::run() {
       whiteTexture.attachToSlot(0);
       glslProgram.setInt("uBaseColorTexture", 0);
 
-      whiteTexture.attachToSlot(1);
+      blackTexture.attachToSlot(1);
       glslProgram.setInt("uMetallicRoughnessTexture", 1);
+
+      blackTexture.attachToSlot(1);
+      glslProgram.setInt("uEmissiveTexture", 2);
     }
 
     glslProgram.setFloat("uMetallicFactor", metallicFactor);
     glslProgram.setFloat("uRoughnessFactor", roughnessFactor);
     glslProgram.setVec4f("uBaseColorFactor", baseColor);
-
+    glslProgram.setVec3f("uEmissiveFactor", emissiveFactor);
   };
 
   // Lambda function to draw the scene

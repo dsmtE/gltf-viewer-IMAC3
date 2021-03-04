@@ -11,9 +11,11 @@ uniform float uLightIntensity;
 uniform vec4 uBaseColorFactor;
 uniform float uMetallicFactor;
 uniform float uRoughnessFactor;
+uniform vec3 uEmissiveFactor;
 
 uniform sampler2D uBaseColorTexture;
 uniform sampler2D uMetallicRoughnessTexture;
+uniform sampler2D uEmissiveTexture;
 
 out vec3 fColor;
 
@@ -96,5 +98,7 @@ void main() {
 
   vec3 diffuse = baseColor.rgb * (1 - metallic) * (1- F) / PI;    
 
-  fColor = linear2srgb((diffuse + specular) * radiance * NdotL);
+  vec3 emissive = uEmissiveFactor * srgb2linear(texture2D(uEmissiveTexture, vTexCoords)).rgb;
+
+  fColor = linear2srgb((diffuse + specular) * radiance * NdotL + emissive);
 }
