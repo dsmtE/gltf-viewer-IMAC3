@@ -17,6 +17,9 @@ uniform sampler2D uBaseColorTexture;
 uniform sampler2D uMetallicRoughnessTexture;
 uniform sampler2D uEmissiveTexture;
 
+uniform float uOcclusionStrength;
+uniform sampler2D uOcclusionTexture;
+
 out vec3 fColor;
 
 // ----- Useful constants ----- //
@@ -100,5 +103,13 @@ void main() {
 
   vec3 emissive = uEmissiveFactor * srgb2linear(texture2D(uEmissiveTexture, vTexCoords)).rgb;
 
-  fColor = linear2srgb((diffuse + specular) * radiance * NdotL + emissive);
+  vec3 color = (diffuse + specular) * radiance * NdotL + emissive;
+
+  // uOcclusionStrength == 0 mean no occlusion
+  if (uOcclusionStrength > 0) {
+    float occlusion = texture2D(uOcclusionTexture, vTexCoords).r;
+    color = mix(color, color * occlusion, uOcclusionStrength);
+  }
+
+  fColor = linear2srgb(color);
 }

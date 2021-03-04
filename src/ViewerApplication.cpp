@@ -87,6 +87,8 @@ int ViewerApplication::run() {
   bool lightFromCamera = false;
   glm::vec3 lightColor(1.f, 1.f, 1.f);
   float lightIntensity = 1.f;
+  
+  bool occlusionEnable = true;
 
   // used with imgui to recompute LightDir
   float lightTheta = 0.f;
@@ -101,6 +103,7 @@ int ViewerApplication::run() {
     float metallicFactor = 1;
     float roughnessFactor = 1;
     glm::vec3 emissiveFactor(0);
+    float occlusionStrength = 0;
     
     if (materialIndex >= 0) {
       const tinygltf::Material& material = model.materials[materialIndex];
@@ -114,6 +117,8 @@ int ViewerApplication::run() {
 
       for (int i = 0; i < 3; i++)
         emissiveFactor[i] = static_cast<float>(material.emissiveFactor[i]);
+
+      occlusionStrength = (float)material.occlusionTexture.strength;
 
       if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
         const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
@@ -145,6 +150,16 @@ int ViewerApplication::run() {
           }
       }
 
+      if (material.emissiveTexture.index >= 0) {
+        const tinygltf::Texture& texture = model.textures[material.occlusionTexture.index];
+        if (texture.source >= 0) {
+          const Texture& textureObject = textureObjects[texture.source];
+
+          textureObject.attachToSlot(3);
+          glslProgram.setInt("uOcclusionTexture", 3);
+          }
+      }
+
     }else {
       whiteTexture.attachToSlot(0);
       glslProgram.setInt("uBaseColorTexture", 0);
@@ -160,6 +175,7 @@ int ViewerApplication::run() {
     glslProgram.setFloat("uRoughnessFactor", roughnessFactor);
     glslProgram.setVec4f("uBaseColorFactor", baseColor);
     glslProgram.setVec3f("uEmissiveFactor", emissiveFactor);
+    glslProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0.0f);
   };
 
   // Lambda function to draw the scene
@@ -307,6 +323,7 @@ int ViewerApplication::run() {
           ImGui::ColorEdit3("color", (float *)&lightColor);
           ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
           ImGui::Checkbox("light from camera", &lightFromCamera);
+          ImGui::Checkbox("enable occlusion", &occlusionEnable);
       }
 
       }
