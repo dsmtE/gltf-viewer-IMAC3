@@ -73,14 +73,12 @@ int ViewerApplication::run() {
 
   // Create white texture for object with no base color texture
   Texture whiteTexture;
-  whiteTexture.genTexture(GL_LINEAR, GL_LINEAR, GL_REPEAT);
   const float white[] = {1, 1, 1, 1};
-  whiteTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
+  whiteTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   Texture blackTexture;
-  blackTexture.genTexture(GL_LINEAR, GL_LINEAR, GL_REPEAT);
   const float black[] = {0, 0, 0, 1};
-  blackTexture.upload(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white);
+  whiteTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
   
   // light parameters
   glm::vec3 lightDirection(1, 1, 1);
@@ -430,11 +428,7 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
     const tinygltf::Image& image = model.images[modelTexture.source];
     const tinygltf::Sampler& sampler = modelTexture.sampler >= 0 ? model.samplers[modelTexture.sampler] : defaultSampler;
 
-    texture.genTexture(sampler.minFilter != -1 ? sampler.minFilter : GL_LINEAR,
-                       sampler.magFilter != -1 ? sampler.magFilter : GL_LINEAR,
-                       {sampler.wrapS, sampler.wrapT, sampler.wrapR});
-
-    texture.upload(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data());
+    texture.init(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data(), sampler);
   }
 
   return textureObjects;
