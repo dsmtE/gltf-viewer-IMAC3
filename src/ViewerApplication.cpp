@@ -59,15 +59,29 @@ int ViewerApplication::run() {
     cameraController->setCamera(Camera{eye, center, up});
   }
 
+  // light parameters
+  glm::vec3 lightDirection(1, 1, 1);
+  bool lightFromCamera = false;
+  glm::vec3 lightColor(1.f, 1.f, 1.f);
+  float lightIntensity = 1.f;
+  
+  bool occlusionEnable = true;
+  bool normalEnable = true;
+  bool tangentAvailable = false;
+
+  // used with imgui to recompute LightDir
+  float lightTheta = 0.f;
+  float lightPhi = 0.f;
+
   // gltf loading
   const std::vector<GLuint> bufferObjects = createBufferObjects(model);
 
   const std::vector<std::pair<std::string, GLuint>> attributesNamesAndIndex = {{
-    {"POSITION", 0}, {"NORMAL", 1}, {"TEXCOORD_0", 2}
+    {"POSITION", 0}, {"NORMAL", 1}, {"TEXCOORD_0", 2}, {"TANGENT", 3}
   }};
 
   std::vector<VaoRange> meshVAOInfos;
-  std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos);
+  std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos, normalEnable, tangentAvailable);
 
   std::vector<Texture> textureObjects = createTextureObjects(model);
 
@@ -78,19 +92,11 @@ int ViewerApplication::run() {
 
   Texture blackTexture;
   const float black[] = {0, 0, 0, 1};
-  whiteTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
-  
-  // light parameters
-  glm::vec3 lightDirection(1, 1, 1);
-  bool lightFromCamera = false;
-  glm::vec3 lightColor(1.f, 1.f, 1.f);
-  float lightIntensity = 1.f;
-  
-  bool occlusionEnable = true;
+  blackTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
-  // used with imgui to recompute LightDir
-  float lightTheta = 0.f;
-  float lightPhi = 0.f;
+  Texture bumpTexture;
+  const float bump[] = {0, 0, 1, 1};
+  bumpTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, bump, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
@@ -158,6 +164,16 @@ int ViewerApplication::run() {
           }
       }
 
+      if (material.normalTexture.index >= 0) {
+        const tinygltf::Texture& texture = model.textures[material.normalTexture.index];
+        if (texture.source >= 0) {
+          const Texture& textureObject = textureObjects[texture.source];
+
+          textureObject.attachToSlot(4);
+          glslProgram.setInt("uNormalTexture", 4);
+          }
+      }
+
     }else {
       whiteTexture.attachToSlot(0);
       glslProgram.setInt("uBaseColorTexture", 0);
@@ -165,15 +181,22 @@ int ViewerApplication::run() {
       blackTexture.attachToSlot(1);
       glslProgram.setInt("uMetallicRoughnessTexture", 1);
 
-      blackTexture.attachToSlot(1);
+      blackTexture.attachToSlot(2);
       glslProgram.setInt("uEmissiveTexture", 2);
+
+      whiteTexture.attachToSlot(3);
+      glslProgram.setInt("uOcclusionTexture", 3);
+
+      bumpTexture.attachToSlot(4);
+      glslProgram.setInt("uNormalTexture", 4);
     }
 
     glslProgram.setFloat("uMetallicFactor", metallicFactor);
     glslProgram.setFloat("uRoughnessFactor", roughnessFactor);
     glslProgram.setVec4f("uBaseColorFactor", baseColor);
     glslProgram.setVec3f("uEmissiveFactor", emissiveFactor);
-    glslProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0.0f);
+    glslProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
+    glslProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
   };
 
   // Lambda function to draw the scene
@@ -209,6 +232,7 @@ int ViewerApplication::run() {
         glslProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
         glslProgram.setVec3f("uLightColor", lightColor);
         glslProgram.setFloat("uLightIntensity", lightIntensity);
+        glslProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
 
         // iterate over primitives
         for (size_t i = 0; i < mesh.primitives.size(); ++i) {
@@ -322,6 +346,9 @@ int ViewerApplication::run() {
           ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
           ImGui::Checkbox("light from camera", &lightFromCamera);
           ImGui::Checkbox("enable occlusion", &occlusionEnable);
+          if(tangentAvailable) {
+            ImGui::Checkbox("enable normal mapping", &normalEnable);
+          }
       }
 
       }
@@ -434,9 +461,8 @@ std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Mod
   return textureObjects;
 }
 
-
 std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
-  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos) const {
+  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos, bool& normalEnable, bool& tangentAvailable) const {
 
   std::vector<GLuint> vertexArrayObjects; // will be stack VAO for each mesh and primitives in this vector
 
@@ -477,8 +503,10 @@ std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::
           // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glVertexAttribPointer.xhtml
           glVertexAttribPointer(attributIdx, accessor.type, accessor.componentType, GL_FALSE,
           static_cast<GLsizei>(bufferView.byteStride), (const GLvoid *)byteOffset);
+
+          if(attributName == "TANGENT") tangentAvailable = true;
         } else {
-          std::cout << "Unknown attribut \"" << attributName <<  "\" in mesh " << mesh.name << "." << std::endl;
+          std::cerr << "Unknown attribut \"" << attributName <<  "\" in mesh " << mesh.name << "." << std::endl;
         }
       } // end attributs
 
