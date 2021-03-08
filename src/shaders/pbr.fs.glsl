@@ -6,6 +6,7 @@ in vec2 vTexCoords;
 
 // normal mapping
 in vec3 vT;
+in vec3 vB;
 in vec3 vN;
 
 uniform vec3 uLightDirection;
@@ -80,16 +81,14 @@ vec3 unpackNormal(vec4 packedNormal) {
   packedNormal.x *= packedNormal.w;
 
   vec3 normal;
-  normal.rg = packedNormal.rg * 2 -1;
+  normal.rg = packedNormal.rg * 2 - 1;
   normal.b = sqrt(1-saturate(dot(normal.rg, normal.rg)));
   return normal;
 }
 
-vec3 ComputeNormal(vec3 N, vec3 T, vec4 normalTextureValue) {
-  T = normalize(T);
-  N = normalize(N);
-  mat3 vTBN = mat3(T, cross(N, T), N);
-  return vTBN * unpackNormal(normalTextureValue);
+vec3 computeNormal(vec3 T, vec3 B, vec3 N, vec4 normalTextureValue) {
+  mat3 TBN = mat3(normalize(T), normalize(B), normalize(N));
+  return TBN * unpackNormal(normalTextureValue);
 }
 
 void main() {
@@ -107,7 +106,7 @@ void main() {
   float roughness = uRoughnessFactor * metallicRougnessFromTexture.g;
 
   if(uNormalEnable == 1) {
-    N = ComputeNormal(vN, vT, texture(uNormalTexture, vTexCoords));
+    N = computeNormal(vT, vB, vN, texture(uNormalTexture, vTexCoords));
   }
 
   vec3 dielectricSpecular = vec3(0.04);
