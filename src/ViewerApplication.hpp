@@ -9,14 +9,6 @@
 
 #include "enum.h"
 
-// forward declaration
-class Texture;
-
-struct VaoRange {
-  GLsizei begin; // Index of first element in vertexArrayObjects
-  GLsizei count; // Number of elements in range
-};
-
 BETTER_ENUM(EControllerType, int, Trackball, FirstPerson)
 
 class ViewerApplication {
@@ -64,11 +56,5 @@ private:
     the creation of a GLFW windows and thus a GL context which must exists
     before most of OpenGL function calls.
   */
-  bool loadGltfFile(tinygltf::Model &model);
-  std::vector<Texture> createTextureObjects(const tinygltf::Model& model) const;
-  std::vector<GLuint> createBufferObjects(const tinygltf::Model& model) const;
-  std::vector<GLuint> createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
-  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos, bool& normalEnable, bool& tangentAvailable) const;
-
-  // std::vector<GLuint> createTangentsBufferOBjects(const tinygltf::Model& model, std::vector<GLuint>& bufferObjects) const;
+  
 };

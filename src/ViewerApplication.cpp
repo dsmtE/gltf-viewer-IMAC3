@@ -1,19 +1,19 @@
 #include "ViewerApplication.hpp"
 
-#include <iostream>
-#include <numeric>
+#include "utils/gltfUtils.hpp"
+#include "utils/images.hpp"
+#include "utils/Texture.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
 
-#include "utils/gltf.hpp"
-#include "utils/images.hpp"
-#include "utils/Texture.hpp"
-
 #include <stb_image_write.h>
 #include <tiny_gltf.h>
+
+#include <iostream>
+#include <numeric>
 
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
@@ -27,12 +27,12 @@ int ViewerApplication::run() {
 
   // load model
   tinygltf::Model model;
-  bool loadModel = loadGltfFile(model);
+  const bool loadModel = gltfUtils::loadGltfFile(model, m_gltfFilePath);
   if (!loadModel) { return -1; }
 
   // Compute model bbox
   glm::vec3 bboxMin, bboxMax;
-  computeSceneBounds(model, bboxMin, bboxMax);
+  gltfUtils::computeSceneBounds(model, bboxMin, bboxMax);
   const glm::vec3 diag = bboxMax - bboxMin;
   const float maxDistance = glm::length(diag);
 
@@ -74,16 +74,16 @@ int ViewerApplication::run() {
   float lightPhi = 0.f;
 
   // gltf loading
-  const std::vector<GLuint> bufferObjects = createBufferObjects(model);
+  const std::vector<GLuint> bufferObjects = gltfUtils::createBufferObjects(model);
 
   const std::vector<std::pair<std::string, GLuint>> attributesNamesAndIndex = {{
     {"POSITION", 0}, {"NORMAL", 1}, {"TEXCOORD_0", 2}, {"TANGENT", 3}
   }};
 
-  std::vector<VaoRange> meshVAOInfos;
-  std::vector<GLuint> vertexArrayObjects = createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos, normalEnable, tangentAvailable);
+  std::vector<gltfUtils::VaoRange> meshVAOInfos;
+  std::vector<GLuint> vertexArrayObjects = gltfUtils::createVertexArrayObjects(model, bufferObjects, attributesNamesAndIndex, meshVAOInfos, normalEnable, tangentAvailable);
 
-  std::vector<Texture> textureObjects = createTextureObjects(model);
+  std::vector<Texture> textureObjects = gltfUtils::createTextureObjects(model);
 
   // Create white texture for object with no base color texture
   Texture whiteTexture;
@@ -211,12 +211,12 @@ int ViewerApplication::run() {
     // We use a std::function because a simple lambda cannot be recursive
     const std::function<void(int, const glm::mat4 &)> drawNode = [&](int nodeIdx, const glm::mat4 &parentMatrix) {
       const tinygltf::Node& node = model.nodes[nodeIdx];
-      const glm::mat4 modelMatrix = getLocalToWorldMatrix(node, parentMatrix);
+      const glm::mat4 modelMatrix = gltfUtils::getLocalToWorldMatrix(node, parentMatrix);
 
       // If is actually a mesh (not a camera or a light)
       if (node.mesh >= 0) {
         const tinygltf::Mesh& mesh = model.meshes[node.mesh];
-        const VaoRange& meshVAOInfo = meshVAOInfos[node.mesh];
+        const gltfUtils::VaoRange& meshVAOInfo = meshVAOInfos[node.mesh];
 
         // compute matrix
         const glm::mat4 mvMatrix = viewMatrix * modelMatrix;
@@ -406,126 +406,4 @@ ViewerApplication::ViewerApplication(const fs::path &appPath, uint32_t width,
   glfwSetKeyCallback(m_GLFWHandle.window(), keyCallback);
 
   printGLVersion();
-}
-
-bool ViewerApplication::loadGltfFile(tinygltf::Model &model) {
-  tinygltf::TinyGLTF loader;
-  std::string err;
-  std::string warn;
-
-  bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, m_gltfFilePath.string());
-
-  if (!warn.empty()) { std::cerr << warn << std::endl; }
-
-  if (!err.empty()) { std::cerr << err << std::endl; }
-
-  if (!ret) { std::cerr << "Failed to parse glTF file" << std::endl; }
-
-  return ret;
-}
-
-std::vector<GLuint> ViewerApplication::createBufferObjects(const tinygltf::Model &model) const {
-  std::vector<GLuint> bufferObjects(model.buffers.size(), 0);
-
-  glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data());
-
-  for (size_t i = 0; i < model.buffers.size(); ++i) {
-    glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[i]);
-    glBufferStorage(GL_ARRAY_BUFFER, model.buffers[i].data.size(), model.buffers[i].data.data(), 0);
-  }
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-  return bufferObjects;
-}
-
-std::vector<Texture> ViewerApplication::createTextureObjects(const tinygltf::Model &model) const {
-  std::vector<Texture> textureObjects(model.textures.size());
-
-  tinygltf::Sampler defaultSampler;
-  defaultSampler.minFilter = GL_LINEAR;
-  defaultSampler.magFilter = GL_LINEAR;
-  defaultSampler.wrapS = GL_REPEAT;
-  defaultSampler.wrapT = GL_REPEAT;
-  defaultSampler.wrapR = GL_REPEAT;
-
-  for (size_t i = 0; i < model.textures.size(); ++i) { // foreach model texture
-    Texture& texture = textureObjects[i];
-    const tinygltf::Texture& modelTexture = model.textures[i];
-    assert(modelTexture.source >= 0);
-    const tinygltf::Image& image = model.images[modelTexture.source];
-    const tinygltf::Sampler& sampler = modelTexture.sampler >= 0 ? model.samplers[modelTexture.sampler] : defaultSampler;
-
-    texture.init(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data(), sampler);
-  }
-
-  return textureObjects;
-}
-
-std::vector<GLuint> ViewerApplication::createVertexArrayObjects(const tinygltf::Model& model, const std::vector<GLuint>& bufferObjects, 
-  const std::vector<std::pair<std::string, GLuint>>& attributesNamesAndIndex, std::vector<VaoRange>& meshVAOInfos, bool& normalEnable, bool& tangentAvailable) const {
-
-  std::vector<GLuint> vertexArrayObjects; // will be stack VAO for each mesh and primitives in this vector
-
-  meshVAOInfos.resize(model.meshes.size()); // one VAO info struct for each meshes
-
-  for (size_t i = 0; i < model.meshes.size(); ++i) {
-    const tinygltf::Mesh &mesh = model.meshes[i];
-    VaoRange& vaoRange = meshVAOInfos[i];
-    vaoRange.begin = static_cast<GLsizei>(vertexArrayObjects.size());
-    vaoRange.count = static_cast<GLsizei>(mesh.primitives.size());
-
-    vertexArrayObjects.resize(vertexArrayObjects.size() + mesh.primitives.size()); // extend size for this mesh primitives count
-
-    glGenVertexArrays(vaoRange.count, &vertexArrayObjects[vaoRange.begin]); // gen Vertex arrays for our new mesh primitives
-
-    for (size_t primitiveIdx = 0; primitiveIdx < mesh.primitives.size(); ++primitiveIdx) { // for each primitives
-      const GLuint vao = vertexArrayObjects[vaoRange.begin + primitiveIdx];
-      const tinygltf::Primitive &primitive = mesh.primitives[primitiveIdx];
-      glBindVertexArray(vao);
-
-      for(const auto &attributInfos : attributesNamesAndIndex) { // for each attributs
-
-        const std::string attributName = attributInfos.first;
-        const GLuint attributIdx = attributInfos.second;
-
-        const auto iterator = primitive.attributes.find(attributName);
-        if (iterator != end(primitive.attributes)) {
-          const size_t accessorIdx = (*iterator).second;
-          const tinygltf::Accessor &accessor = model.accessors[accessorIdx];
-          const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
-          const size_t bufferIdx = bufferView.buffer;
-
-          glEnableVertexAttribArray(attributIdx);
-          assert(GL_ARRAY_BUFFER == bufferView.target); // check target
-          glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[bufferIdx]); // bind to our previous generated buffer Object
-        
-          const size_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
-          // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glVertexAttribPointer.xhtml
-          glVertexAttribPointer(attributIdx, accessor.type, accessor.componentType, GL_FALSE,
-          static_cast<GLsizei>(bufferView.byteStride), (const GLvoid *)byteOffset);
-
-          if(attributName == "TANGENT") tangentAvailable = true;
-        } else {
-          std::cerr << "Unknown attribut \"" << attributName <<  "\" in mesh " << mesh.name << "." << std::endl;
-        }
-      } // end attributs
-
-      if (primitive.indices >= 0) { // bind indices if needed
-        const size_t accessorIdx = primitive.indices;
-        const tinygltf::Accessor &accessor = model.accessors[accessorIdx];
-        const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
-        const size_t bufferIdx = bufferView.buffer;
-
-        assert(GL_ELEMENT_ARRAY_BUFFER == bufferView.target); // check target
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferObjects[bufferIdx]);
-      }
-
-    } // end mesh primitives
-  } // end meshs
-
-  glBindVertexArray(0); // unbind vertex array safety
-
-  std::cout << "Number of VAOs: " << vertexArrayObjects.size() << std::endl;
-
-  return vertexArrayObjects;
 }
