@@ -2,6 +2,7 @@
 
 #include "glfw.hpp"
 #include <array>
+#include <iostream>
 
 // forward declaration of tinygltf sampler
 namespace tinygltf {
@@ -29,8 +30,11 @@ public:
 
 	template <typename T>
 	void init(const int width, const int height, const GLint internalformat, const GLenum format, const GLenum type, const T* data, 
-	const GLint minFilter = GL_LINEAR, const GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE}) {
+	GLint minFilter = GL_LINEAR, GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE}) {
 		
+		minFilter = minFilter != -1 ? minFilter : GL_LINEAR;
+		magFilter = magFilter != -1 ? magFilter : GL_LINEAR;
+
 		glBindTexture(GL_TEXTURE_2D, textureId_);
 		glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data);
 
@@ -46,7 +50,7 @@ public:
 		}
 
 #ifndef NDEBUG
-	bool initialized_ = true;
+	initialized_ = true;
 #endif
 
 		glBindTexture(GL_TEXTURE_2D, 0);
