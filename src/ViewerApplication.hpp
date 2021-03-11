@@ -26,6 +26,8 @@ private:
   GLsizei m_nWindowWidth = 1280;
   GLsizei m_nWindowHeight = 720;
 
+  float frameRateLimit = 60;
+  
   const fs::path m_AppPath;
   const std::string m_AppName;
   const fs::path m_ShadersRootPath;

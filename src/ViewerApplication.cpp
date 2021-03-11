@@ -286,12 +286,18 @@ int ViewerApplication::run() {
     return 0;
   }
 
+  bool shouldDraw = true;
+  double secondLastDraw = 0;
   // Loop until the user closes the window
   for (size_t iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount) {
     const double seconds = glfwGetTime();
 
-    const Camera camera = cameraController->getCamera();
-    drawScene(camera);
+    const Camera& camera = cameraController->getCamera();
+    if(shouldDraw) {
+      secondLastDraw = seconds;
+      shouldDraw = false;
+      drawScene(camera);
+    }
 
     // GUI code:
     imguiNewFrame();
@@ -299,6 +305,7 @@ int ViewerApplication::run() {
     {
       ImGui::Begin("GUI");
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::SliderFloat("frameRateLimit", &frameRateLimit, 1.f, 800.f, "%.0f", 3);
       if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Text("eye: %.3f %.3f %.3f", camera.eye().x, camera.eye().y, camera.eye().z);
         ImGui::Text("center: %.3f %.3f %.3f", camera.center().x, camera.center().y, camera.center().z);
@@ -360,6 +367,11 @@ int ViewerApplication::run() {
     glfwPollEvents(); // Poll for and process events
 
     const double ellapsedTime = glfwGetTime() - seconds;
+
+    if(glfwGetTime() - secondLastDraw > 1/frameRateLimit) {
+      shouldDraw = true;
+    }
+
     const bool guiHasFocus = ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard;
     if (!guiHasFocus) { cameraController->update(float(ellapsedTime)); }
 
