@@ -17,6 +17,9 @@ namespace gltfUtils {
     };
 
     bool loadGltfFile(tinygltf::Model &model, const std::filesystem::path& path);
+    
+    bool attributAvailable(const tinygltf::Model& model, std::string attributName);
+    bool attributAvailable(const tinygltf::Mesh& mesh, std::string attributName);
 
     std::vector<Texture> createTextureObjects(const tinygltf::Model& model);
     std::vector<GLuint> createBufferObjects(const tinygltf::Model& model);
@@ -25,4 +28,5 @@ namespace gltfUtils {
 
     glm::mat4 getLocalToWorldMatrix(const tinygltf::Node& node, const glm::mat4& parentMatrix);
     void computeSceneBounds(const tinygltf::Model& model, glm::vec3& bboxMin, glm::vec3& bboxMax);
+    std::vector<std::vector<glm::vec4>> computeTangentData(const tinygltf::Model& model);
 }

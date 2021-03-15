@@ -73,6 +73,15 @@ int ViewerApplication::run() {
   float lightTheta = 0.f;
   float lightPhi = 0.f;
 
+  // std::vector<std::vector<glm::vec4>> meshesTangentBuffer;
+  // if(!gltfUtils::attributAvailable(model, "TANGENT")) {
+  //   try {
+  //     meshesTangentBuffer = gltfUtils::computeTangentData(model);
+  //   } catch (const std::runtime_error e) {
+  //     std::cout << e.what() << std::endl;
+  //   }
+  // }
+  
   // gltf loading
   const std::vector<GLuint> bufferObjects = gltfUtils::createBufferObjects(model);
 

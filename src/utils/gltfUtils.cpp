@@ -44,7 +44,35 @@ namespace gltfUtils {
     return textureObjects;
   }
 
-  std::vector<GLuint> createBufferObjects(const tinygltf::Model &model) {
+
+  bool attributAvailable(const tinygltf::Mesh& mesh, std::string attributName) {
+    bool available = true;
+    if(mesh.primitives.size() > 0) {
+      std::wcerr << "Mesh has multiple primitives. we will check attribut avalability for each primitives." << std::endl;
+    }
+
+    for (size_t primitiveIdx = 0; primitiveIdx < mesh.primitives.size(); ++primitiveIdx) { // for each primitives
+      const tinygltf::Primitive &primitive = mesh.primitives[primitiveIdx];
+      if (primitive.attributes.find(attributName) == end(primitive.attributes)) {
+        available = false;
+        break;
+      }
+    }
+    return available;
+  }
+
+  bool attributAvailable(const tinygltf::Model& model, std::string attributName) {
+    bool available = true;
+    for (size_t i = 0; i < model.meshes.size(); ++i) {
+      if(!attributAvailable(model.meshes[i], attributName)) {
+        available = false;
+        break;
+      }
+    }
+    return available;
+  }
+
+  std::vector<GLuint> createBufferObjects(const tinygltf::Model& model) {
     std::vector<GLuint> bufferObjects(model.buffers.size(), 0);
 
     glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data());
@@ -147,7 +175,7 @@ namespace gltfUtils {
     return node.scale.empty() ? TR : glm::scale(TR, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
   };
 
-  void computeSceneBounds(const tinygltf::Model &model, glm::vec3 &bboxMin, glm::vec3 &bboxMax) {
+  void computeSceneBounds(const tinygltf::Model& model, glm::vec3 &bboxMin, glm::vec3 &bboxMax) {
     // Compute scene bounding box
     // todo refactor with scene drawing
     // todo need a visitScene generic function that takes a accept() functor
@@ -238,9 +266,25 @@ namespace gltfUtils {
     }
   }
 
-  std::vector<glm::vec4> computeTangentVector(const tinygltf::Model &model) {
+  namespace { // scoped to file functions
+    glm::vec4 computeTriangleTangent(const std::array<glm::vec3, 3>& pos, const std::array<glm::vec3, 3>& uvs) {
+
+      const glm::vec3 deltaPos1 = pos[1]-pos[0];
+      const glm::vec3 deltaPos2 = pos[2]-pos[0];
+
+      const glm::vec2 deltaUV1 = uvs[1]-uvs[0];
+      const glm::vec2 deltaUV2 = uvs[2]-uvs[0];
+
+      const glm::vec3 tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+
+      // Note that tangents in GLTF are stored as vec4(Float4), where w is used to indicate handedness 
+      return glm::vec4(tangent, 1);
+    }
+  }
+
+  std::vector<std::vector<glm::vec4>> computeTangentData(const tinygltf::Model& model) {
     // help : https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#geometry
-    std::vector<glm::vec4> tangentBuffer; // tengent value will be stacked for each mesh and primitives in this vector
+    std::vector<std::vector<glm::vec4>> meshesTangentBuffer(model.meshes.size()); // tengent value will be stacked for each mesh and primitives in this vector
 
     for (size_t meshIdx = 0; meshIdx < model.meshes.size(); ++meshIdx) {
       const tinygltf::Mesh& mesh = model.meshes[meshIdx];
@@ -250,6 +294,7 @@ namespace gltfUtils {
 
         // Extract POSITION and UV attributs
         const auto posAttrIdxIt = primitive.attributes.find("POSITION");
+
         if (posAttrIdxIt == end(primitive.attributes)) {
           std::cerr << "POSITION attribut can't be found for the primitives " << primitiveIdx << "in the mesh named " << mesh.name << std::endl;
           continue;
@@ -263,28 +308,83 @@ namespace gltfUtils {
         const tinygltf::Accessor& posAccessor = model.accessors[(*posAttrIdxIt).second];
         const tinygltf::Accessor& uvAccessor = model.accessors[(*uvAttrIdxIt).second];
 
-        assert(posAccessor.type != TINYGLTF_TYPE_VEC3 && "pos accessor with type != VEC3, skipping");
-        assert(uvAccessor.type != TINYGLTF_TYPE_VEC2 && "uv accessor with type != VEC2, skipping");
+        assert(posAccessor.type == TINYGLTF_TYPE_VEC3 && "computeTangent: expected type of POSTION is VEC3"); // , got" <<  posAccessor.type);
+        assert(uvAccessor.type == TINYGLTF_TYPE_VEC2 && "computeTangent: expected type of TEXCOORD_0 is VEC2");
 
-        assert(posAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT && "pos accessor with componentType != float, skipping");
-        assert(uvAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT && "uv accessor with componentType != float, skipping");
+        assert(posAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && "POSTION: expected float componentType");
+        assert(uvAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT && "TEXCOORD_0: expected float componentType");
 
-        assert(posAccessor.count != uvAccessor.count && "position an uv accessors count (buffer size) must be equals");
+        assert(posAccessor.count == uvAccessor.count && "position an uv accessors count (buffer size) must be equals");
+
+        std::cout << __FUNCTION__ << ": posAccessor.count : " << posAccessor.count << std::endl;
 
         const tinygltf::BufferView& posBufferView = model.bufferViews[posAccessor.bufferView];
         const size_t posByteOffset = posAccessor.byteOffset + posBufferView.byteOffset;
         const tinygltf::Buffer &posBuffer = model.buffers[posBufferView.buffer];
-        const size_t posByteStride = posBufferView.byteStride ? posBufferView.byteStride : 3 * tinygltf::GetComponentSizeInBytes(posAccessor.componentType);
+        const size_t posByteStride = posBufferView.byteStride ? posBufferView.byteStride : 3 * 4; // sizeof(float) using tinygltf::GetComponentSizeInBytes
+        
         const tinygltf::BufferView& uvBufferView = model.bufferViews[uvAccessor.bufferView];
         const size_t uvByteOffset = uvAccessor.byteOffset + uvBufferView.byteOffset;
         const tinygltf::Buffer &uvBuffer = model.buffers[uvBufferView.buffer];
-        const size_t uvByteStride = uvBufferView.byteStride ? uvBufferView.byteStride : 3 * tinygltf::GetComponentSizeInBytes(posAccessor.componentType);
+        const size_t uvByteStride = uvBufferView.byteStride ? uvBufferView.byteStride : 3 * 4;
 
         if (primitive.indices >= 0) {
-          // TODO manage indices
+          throw std::runtime_error("indexed mesh: tengant values can't be coputed properly.");
+          // const tinygltf::Accessor &indexAccessor = model.accessors[primitive.indices];
+          // const tinygltf::BufferView &indexBufferView = model.bufferViews[indexAccessor.bufferView];
+          // const size_t indexByteOffset = indexAccessor.byteOffset + indexBufferView.byteOffset;
+          // const tinygltf::Buffer &indexBuffer = model.buffers[indexBufferView.buffer];
+          // size_t indexByteStride = indexBufferView.byteStride;
+
+          // if(indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
+          //    indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
+          //    indexAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+          //   indexByteStride = indexByteStride ? indexByteStride : tinygltf::GetComponentSizeInBytes(indexAccessor.componentType);
+          // }else {
+          //   std::cerr << "Index component type" << indexAccessor.componentType << "not supported" << std::endl;
+          //   continue;
+          // }
+
+          // std::cout << __FUNCTION__ << ": indexAccessor count : " << indexAccessor.count << std::endl;
+
+          // assert(indexAccessor.count % 3 == 0 && "invalid indexAccessor count");
+
+          // for (size_t i = 0; i < indexAccessor.count; i+=3) {
+          //   uint32_t idx1 = 0;
+          //   uint32_t idx2 = 0;
+          //   uint32_t idx3 = 0;
+
+          //   switch (indexAccessor.componentType) {
+          //     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+          //       idx1 = reinterpret_cast<const uint8_t&>(indexBuffer.data[indexByteOffset + indexByteStride * i]);
+          //       idx2 = reinterpret_cast<const uint8_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+1)]);
+          //       idx3 = reinterpret_cast<const uint8_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+2)]);
+          //       break;
+          //     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+          //       idx1 = reinterpret_cast<const uint16_t&>(indexBuffer.data[indexByteOffset + indexByteStride * i]);
+          //       idx2 = reinterpret_cast<const uint16_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+1)]);
+          //       idx3 = reinterpret_cast<const uint16_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+2)]);
+          //       break;
+          //     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+          //       idx1 = reinterpret_cast<const uint32_t&>(indexBuffer.data[indexByteOffset + indexByteStride * i]);
+          //       idx2 = reinterpret_cast<const uint32_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+1)]);
+          //       idx3 = reinterpret_cast<const uint32_t&>(indexBuffer.data[indexByteOffset + indexByteStride * (i+2)]);
+          //       break;
+          //   }
+          //   const glm::vec3& localPos1 = reinterpret_cast<const glm::vec3&>(posBuffer.data[posByteOffset + posByteStride * idx1]);
+          //   const glm::vec3& localPos2 = reinterpret_cast<const glm::vec3&>(posBuffer.data[posByteOffset + posByteStride * idx2]);
+          //   const glm::vec3& localPos3 = reinterpret_cast<const glm::vec3&>(posBuffer.data[posByteOffset + posByteStride * idx3]);
+
+          //   const glm::vec3& localUv1 = reinterpret_cast<const glm::vec3&>(uvBuffer.data[uvByteOffset + uvByteStride * idx1]);
+          //   const glm::vec3& localUv2 = reinterpret_cast<const glm::vec3&>(uvBuffer.data[uvByteOffset + uvByteStride * idx2]);
+          //   const glm::vec3& localUv3 = reinterpret_cast<const glm::vec3&>(uvBuffer.data[uvByteOffset + uvByteStride * idx3]);
+
+          //   const glm::vec4 tangent = computeTriangleTangent({localPos1, localPos2, localPos3}, {localUv1, localUv2, localUv3});
+          //   meshesTangentBuffer[meshIdx].push_back(std::move(tangent)); // Same tangent for all three vertices of the triangle
+          // }
 
         } else {
-            
+          assert(posAccessor.count % 3 == 0 && "invalid accessor count");
           for (size_t i = 0; i < posAccessor.count; i+=3) {
             const glm::vec3& localPos1 = reinterpret_cast<const glm::vec3&>(posBuffer.data[posByteOffset + posByteStride * i]);
             const glm::vec3& localPos2 = reinterpret_cast<const glm::vec3&>(posBuffer.data[posByteOffset + posByteStride * (i+1)]);
@@ -294,27 +394,13 @@ namespace gltfUtils {
             const glm::vec3& localUv2 = reinterpret_cast<const glm::vec3&>(uvBuffer.data[uvByteOffset + uvByteStride * (i+1)]);
             const glm::vec3& localUv3 = reinterpret_cast<const glm::vec3&>(uvBuffer.data[uvByteOffset + uvByteStride * (i+2)]);
 
-            const glm::vec4 tangent = computeTangent({localPos1, localPos1, localPos1}, {localUv1, localUv1, localUv1});
-            tangentBuffer.push_back(std::move(tangent)); // Same tangent for all three vertices of the triangle
+            const glm::vec4 tangent = computeTriangleTangent({localPos1, localPos2, localPos3}, {localUv1, localUv2, localUv3});
+            for (size_t i = 0; i < 3; ++i)
+              meshesTangentBuffer[meshIdx].push_back(tangent); // Same tangent for all three vertices of the triangle
           }
         }
-
       } // end mesh primitives
     } // end meshs
-  }
-
-  namespace { // scoped to file functions
-    glm::vec4 computeTangent(const std::array<glm::vec3, 3>& pos, const std::array<glm::vec3, 3>& uvs) {
-
-      const glm::vec3 deltaPos1 = pos[1]-pos[0];
-      const glm::vec3 deltaPos2 = pos[2]-pos[0];
-
-      const glm::vec2 deltaUV1 = uvs[1]-uvs[0];
-      const glm::vec2 deltaUV2 = uvs[2]-uvs[0];
-
-      const glm::vec3 tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
-
-      // Note that tangents in GLTF are stored as vec4(Float4), where w is used to indicate handedness 
-      return glm::vec4(tangent, 1);
+    return meshesTangentBuffer;
   }
 }
