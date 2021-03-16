@@ -135,6 +135,7 @@ class GLProgram
   GLuint m_GLId;
   typedef std::unique_ptr<char[]> CharBuffer;
   std::unordered_map<std::string, GLint> uniformLocationCache_;
+  std::unordered_map<std::string, bool> uniformMissingWarning_;
 
 public:
   GLProgram() : m_GLId(glCreateProgram()) {}
@@ -206,7 +207,8 @@ public:
     const GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
 
 #ifndef NDEBUG
-    if(location == -1) {
+    if(location == -1 && !uniformMissingWarning_[uniformName]) {
+      uniformMissingWarning_[uniformName] = true;
       std::cerr << "[Shader] uniform \"" << uniformName << "\" doesn't exist or is not used !" << std::endl;
       return -1;
     }
