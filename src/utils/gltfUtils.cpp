@@ -77,13 +77,13 @@ namespace gltfUtils {
   std::vector<GLuint> createBufferObjects(const tinygltf::Model& model) {
     std::vector<GLuint> bufferObjects(model.buffers.size(), 0);
 
-    glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data());
+    GLCall(glGenBuffers(static_cast<GLsizei>(model.buffers.size()), bufferObjects.data()));
 
     for (size_t i = 0; i < model.buffers.size(); ++i) {
-      glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[i]);
-      glBufferStorage(GL_ARRAY_BUFFER, model.buffers[i].data.size(), model.buffers[i].data.data(), 0);
+      GLCall(glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[i]));
+      GLCall(glBufferStorage(GL_ARRAY_BUFFER, model.buffers[i].data.size(), model.buffers[i].data.data(), 0));
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
     return bufferObjects;
   }
@@ -103,12 +103,12 @@ namespace gltfUtils {
 
       vertexArrayObjects.resize(vertexArrayObjects.size() + mesh.primitives.size()); // extend size for this mesh primitives count
 
-      glGenVertexArrays(vaoRange.count, &vertexArrayObjects[vaoRange.begin]); // gen Vertex arrays for our new mesh primitives
+      GLCall(glGenVertexArrays(vaoRange.count, &vertexArrayObjects[vaoRange.begin])); // gen Vertex arrays for our new mesh primitives
 
       for (size_t primitiveIdx = 0; primitiveIdx < mesh.primitives.size(); ++primitiveIdx) { // for each primitives
         const GLuint vao = vertexArrayObjects[vaoRange.begin + primitiveIdx];
         const tinygltf::Primitive &primitive = mesh.primitives[primitiveIdx];
-        glBindVertexArray(vao);
+        GLCall(glBindVertexArray(vao));
 
         for(const auto &attributInfos : attributesNamesAndIndex) { // for each attributs
 
@@ -122,14 +122,14 @@ namespace gltfUtils {
             const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
             const size_t bufferIdx = bufferView.buffer;
 
-            glEnableVertexAttribArray(attributIdx);
+            GLCall(glEnableVertexAttribArray(attributIdx));
             assert(GL_ARRAY_BUFFER == bufferView.target); // check target
-            glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[bufferIdx]); // bind to our previous generated buffer Object
+            GLCall(glBindBuffer(GL_ARRAY_BUFFER, bufferObjects[bufferIdx])); // bind to our previous generated buffer Object
           
             const size_t byteOffset = accessor.byteOffset + bufferView.byteOffset;
             // https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glVertexAttribPointer.xhtml
-            glVertexAttribPointer(attributIdx, accessor.type, accessor.componentType, GL_FALSE,
-            static_cast<GLsizei>(bufferView.byteStride), (const GLvoid *)byteOffset);
+            GLCall(glVertexAttribPointer(attributIdx, accessor.type, accessor.componentType, GL_FALSE,
+            static_cast<GLsizei>(bufferView.byteStride), (const GLvoid *)byteOffset));
 
             if(attributName == "TANGENT") tangentAvailable = true;
           } else {
@@ -144,13 +144,13 @@ namespace gltfUtils {
           const size_t bufferIdx = bufferView.buffer;
 
           assert(GL_ELEMENT_ARRAY_BUFFER == bufferView.target); // check target
-          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferObjects[bufferIdx]);
+          GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferObjects[bufferIdx]));
         }
 
       } // end mesh primitives
     } // end meshs
 
-    glBindVertexArray(0); // unbind vertex array safety
+    GLCall(glBindVertexArray(0)); // unbind vertex array safety
 
     std::cout << "Number of VAOs: " << vertexArrayObjects.size() << std::endl;
 
