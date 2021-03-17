@@ -133,58 +133,33 @@ int ViewerApplication::run() {
 
       occlusionStrength = (float)material.occlusionTexture.strength;
 
-      if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
+      const std::array<std::pair<int, std::string>, 5> texturesIdxAndNames = {{
+        {pbrMetallicRoughness.baseColorTexture.index, "uBaseColorTexture"},
+        {material.normalTexture.index, "uNormalTexture"},
+        {pbrMetallicRoughness.metallicRoughnessTexture.index, "uMetallicRoughnessTexture"},
+        {material.occlusionTexture.index, "uOcclusionTexture"},
+        {material.emissiveTexture.index, "uEmissiveTexture"}
+      }};
 
-          textureObject.attachToShaderSlot(shaderprogram, "uBaseColorTexture", 0);
+      for (int i = 0; i < texturesIdxAndNames.size(); ++i){
+        const int id = texturesIdxAndNames[i].first;
+        const std::string& uName = texturesIdxAndNames[i].second;
+
+        if(id >= 0) {
+          const tinygltf::Texture& texture = model.textures[id];
+          if (texture.source >= 0) {
+            const Texture& textureObject = textureObjects[texture.source];
+            textureObject.attachToShaderSlot(shaderprogram, uName, i);
           }
+        }
       }
-
-      if (material.normalTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.normalTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToShaderSlot(shaderprogram, "uNormalTexture", 1);
-          }
-      }
-
-      if (pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.metallicRoughnessTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToShaderSlot(shaderprogram, "uMetallicRoughnessTexture", 2);
-          }
-      }
-
-      if (material.emissiveTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.occlusionTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToShaderSlot(shaderprogram, "uOcclusionTexture", 3);
-          }
-      }
-
-      if (material.emissiveTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.emissiveTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToShaderSlot(shaderprogram, "uEmissiveTexture", 4);
-          }
-      }
-      
 
     }else {
       whiteTexture.attachToShaderSlot(shaderprogram, "uBaseColorTexture", 0);
-      bumpTexture.attachToShaderSlot(shaderprogram, "uNormalTexture", 2);
-      blackTexture.attachToShaderSlot(shaderprogram, "uMetallicRoughnessTexture", 3);
-      whiteTexture.attachToShaderSlot(shaderprogram, "uOcclusionTexture", 4);
-      blackTexture.attachToShaderSlot(shaderprogram, "uEmissiveTexture", 5);
+      bumpTexture.attachToShaderSlot(shaderprogram, "uNormalTexture", 1);
+      blackTexture.attachToShaderSlot(shaderprogram, "uMetallicRoughnessTexture", 2);
+      whiteTexture.attachToShaderSlot(shaderprogram, "uOcclusionTexture", 3);
+      blackTexture.attachToShaderSlot(shaderprogram, "uEmissiveTexture", 4);
     }
 
     shaderprogram.setVec4f("uBaseColorFactor", baseColor);
