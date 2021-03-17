@@ -22,7 +22,8 @@ namespace gltfUtils {
   }
 
   std::vector<Texture> createTextureObjects(const tinygltf::Model& model) {
-    std::vector<Texture> textureObjects(model.textures.size());
+    std::vector<Texture> textureObjects;
+    textureObjects.reserve(model.textures.size());
 
     tinygltf::Sampler defaultSampler;
     defaultSampler.minFilter = GL_LINEAR;
@@ -32,13 +33,14 @@ namespace gltfUtils {
     defaultSampler.wrapR = GL_REPEAT;
 
     for (size_t i = 0; i < model.textures.size(); ++i) { // foreach model texture
-      Texture& texture = textureObjects[i];
       const tinygltf::Texture& modelTexture = model.textures[i];
       assert(modelTexture.source >= 0);
       const tinygltf::Image& image = model.images[modelTexture.source];
       const tinygltf::Sampler& sampler = modelTexture.sampler >= 0 ? model.samplers[modelTexture.sampler] : defaultSampler;
 
-      texture.init(image.width, image.height, GL_RGBA, GL_RGBA, image.pixel_type, image.image.data(), sampler);
+      const glm::ivec2 size = {image.width, image.height};
+      textureObjects.emplace_back(size, GL_RGBA16F);
+      textureObjects[i].upload(GL_RGBA, image.pixel_type, image.image.data(), sampler);
     }
 
     return textureObjects;
