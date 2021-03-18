@@ -185,11 +185,7 @@ int ViewerApplication::run() {
     const glm::mat4 viewMatrix = camera.getViewMatrix();
 
     // send globa lighting uniforms
-    shaderprogram.setVec3f("uLightColor", lightColor);
-    shaderprogram.setFloat("uLightIntensity", lightIntensity);
     shaderprogram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
-    shaderprogram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
-  
     // The recursive function that should draw a node
     // We use a std::function because a simple lambda cannot be recursive
     const std::function<void(int, const glm::mat4 &)> drawNode = [&](int nodeIdx, const glm::mat4 &parentMatrix) {
@@ -302,7 +298,7 @@ int ViewerApplication::run() {
       shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
       gBuffer.bindTexturesToShader(shadingPassProgram);
 
-      gBuffer.render({m_nWindowWidth, m_nWindowHeight});
+      gBuffer.render();
 
       // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
       // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);

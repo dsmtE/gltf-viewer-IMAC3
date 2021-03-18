@@ -1,7 +1,8 @@
 #pragma once
 
 #include "filesystem.hpp"
-#include "GLExceptions.hpp"
+#include "glDebug.hpp"
+
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -13,53 +14,52 @@
 #include <string>
 #include <unordered_map>
 #include <cassert>
+
 class GLShader {
-  GLuint m_GLId;
+  GLuint id_ = 0;
   typedef std::unique_ptr<char[]> CharBuffer;
 
 public:
-  GLShader(GLenum type) : m_GLId(glCreateShader(type)) {}
+  GLShader(const GLenum type) : id_(GLCALL(glCreateShader(type))) {}
 
-  ~GLShader() { glDeleteShader(m_GLId); }
+  ~GLShader() { GLCALL(glDeleteShader(id_)); }
 
   GLShader(const GLShader &) = delete;
 
   GLShader &operator=(const GLShader &) = delete;
 
-  GLShader(GLShader &&rvalue) : m_GLId(rvalue.m_GLId) { rvalue.m_GLId = 0; }
+  GLShader(GLShader &&rvalue) : id_(rvalue.id_) { rvalue.id_ = 0; }
 
-  GLShader &operator=(GLShader &&rvalue)
-  {
+  GLShader &operator=(GLShader &&rvalue) {
     this->~GLShader();
-    m_GLId = rvalue.m_GLId;
-    rvalue.m_GLId = 0;
+    id_ = rvalue.id_;
+    rvalue.id_ = 0;
     return *this;
   }
 
-  GLuint glId() const { return m_GLId; }
+  inline GLuint id() const { return id_; }
 
-  void setSource(const GLchar *src) { GLCall(glShaderSource(m_GLId, 1, &src, 0)); }
+  void setSource(const GLchar *src) { GLCALL(glShaderSource(id_, 1, &src, 0)); }
 
   void setSource(const std::string &src) { setSource(src.c_str()); }
 
-  bool compile()
-  {
-    glCompileShader(m_GLId);
+  bool compile() {
+    GLCALL(glCompileShader(id_));
     return getCompileStatus();
   }
 
   bool getCompileStatus() const {
     GLint status;
-    GLCall(glGetShaderiv(m_GLId, GL_COMPILE_STATUS, &status));
+    GLCALL(glGetShaderiv(id_, GL_COMPILE_STATUS, &status));
     return status == GL_TRUE;
   }
 
   std::string getInfoLog() const {
     GLint logLength;
-    GLCall(glGetShaderiv(m_GLId, GL_INFO_LOG_LENGTH, &logLength));
+    GLCALL(glGetShaderiv(id_, GL_INFO_LOG_LENGTH, &logLength));
 
     CharBuffer buffer(new char[logLength]);
-    GLCall(glGetShaderInfoLog(m_GLId, logLength, 0, buffer.get()));
+    GLCALL(glGetShaderInfoLog(id_, logLength, 0, buffer.get()));
 
     return std::string(buffer.get());
   }
@@ -83,10 +83,7 @@ template <typename StringType>
 GLShader compileShader(GLenum type, StringType &&src) {
   GLShader shader(type);
   shader.setSource(std::forward<StringType>(src));
-  if (!shader.compile()) {
-    std::cerr << shader.getInfoLog() << std::endl;
-    throw std::runtime_error(shader.getInfoLog());
-  }
+  if (!shader.compile()) throw std::runtime_error(shader.getInfoLog());
   return shader;
 }
 
@@ -96,12 +93,12 @@ GLShader compileShader(GLenum type, StringType &&src) {
 // *.gs.glsl -> geometry shader
 // *.cs.glsl -> compute shader
 inline GLShader loadShader(const fs::path& shaderPath) {
-  static auto extToShaderType =
-      std::unordered_map<std::string, std::pair<GLenum, std::string>>(
-          {{".vs", {GL_VERTEX_SHADER, "vertex"}},
-              {".fs", {GL_FRAGMENT_SHADER, "fragment"}},
-              {".gs", {GL_GEOMETRY_SHADER, "geometry"}},
-              {".cs", {GL_COMPUTE_SHADER, "compute"}}});
+  static std::unordered_map<std::string, GLenum> extToShaderType = {
+    {".vs", GL_VERTEX_SHADER},
+    {".fs", GL_FRAGMENT_SHADER},
+    {".gs", GL_GEOMETRY_SHADER},
+    {".cs", GL_COMPUTE_SHADER}
+  };
 
   const auto ext = shaderPath.stem().extension();
   const auto it = extToShaderType.find(ext.string());
@@ -110,87 +107,85 @@ inline GLShader loadShader(const fs::path& shaderPath) {
     throw std::runtime_error("Unrecognized shader extension " + ext.string());
   }
 
-  std::clog << "Compiling " << (*it).second.second << " shader " << shaderPath << std::endl;
+  const GLenum shaderType = (*it).second;
+  std::clog << "Compiling " << glEnumToStr::find(glEnumToStr::shaderType, shaderType) << " (" << shaderPath.string() << ")" << std::endl;
 
-  GLShader shader{(*it).second.first};
+  GLShader shader(shaderType);
   shader.setSource(loadShaderSource(shaderPath));
   shader.compile();
-  if (!shader.getCompileStatus()) {
-    std::cerr << "Shader compilation error:" << shader.getInfoLog() << std::endl;
+  if (!shader.getCompileStatus())
     throw std::runtime_error("Shader compilation error:" + shader.getInfoLog());
-  }
+  
   return shader;
 }
 
 class GLProgram {
-  GLuint m_GLId;
-  typedef std::unique_ptr<char[]> CharBuffer;
+  GLuint id_;
   std::unordered_map<std::string, GLint> uniformLocationCache_;
   std::unordered_map<std::string, bool> uniformMissingWarning_;
 
 public:
-  GLProgram() : m_GLId(glCreateProgram()) {}
+  GLProgram() : id_(glCreateProgram()) {}
 
-  ~GLProgram() { GLCall(glDeleteProgram(m_GLId)); }
+  ~GLProgram() { GLCALL(glDeleteProgram(id_));}
 
   GLProgram(const GLProgram &) = delete;
 
   GLProgram &operator=(const GLProgram &) = delete;
 
-  GLProgram(GLProgram &&rvalue) : m_GLId(rvalue.m_GLId) { rvalue.m_GLId = 0; }
+  GLProgram(GLProgram &&rvalue) : id_(rvalue.id_) { rvalue.id_ = 0; }
 
   GLProgram &operator=(GLProgram &&rvalue) {
     this->~GLProgram();
-    m_GLId = rvalue.m_GLId;
-    rvalue.m_GLId = 0;
+    id_ = rvalue.id_;
+    rvalue.id_ = 0;
     return *this;
   }
 
-  GLuint glId() const { return m_GLId; }
+  GLuint glId() const { return id_; }
 
   void attachShader(const GLShader &shader) {
-    GLCall(glAttachShader(m_GLId, shader.glId()));
+    GLCALL(glAttachShader(id_, shader.id()));
   }
 
   bool link() {
-    GLCall(glLinkProgram(m_GLId));
+    GLCALL(glLinkProgram(id_));
     return getLinkStatus();
   }
 
   bool getLinkStatus() const {
     GLint linkStatus;
-    GLCall(glGetProgramiv(m_GLId, GL_LINK_STATUS, &linkStatus));
+    GLCALL(glGetProgramiv(id_, GL_LINK_STATUS, &linkStatus));
     return linkStatus == GL_TRUE;
   }
 
   std::string getInfoLog() const {
     GLint logLength;
-    GLCall(glGetProgramiv(m_GLId, GL_INFO_LOG_LENGTH, &logLength));
+    GLCALL(glGetProgramiv(id_, GL_INFO_LOG_LENGTH, &logLength));
 
-    CharBuffer buffer(new char[logLength]);
-    GLCall(glGetProgramInfoLog(m_GLId, logLength, 0, buffer.get()));
+    std::string buffer(logLength, '0');
+    GLCALL(glGetProgramInfoLog(id_, logLength, 0, buffer.data()));
 
-    return std::string(buffer.get());
+    return buffer;
   }
 
-  void use() const { GLCall(glUseProgram(m_GLId)); }
+  void use() const { GLCALL(glUseProgram(id_));}
 
   GLint getAttribLocation(const GLchar *name) const {
-    GLint location = glGetAttribLocation(m_GLId, name);
+    GLint location = GLCALL(glGetAttribLocation(id_, name));
     return location;
   }
 
   inline void bindAttribLocation(GLuint index, const GLchar *name) const {
-    GLCall(glBindAttribLocation(m_GLId, index, name));
+    GLCALL(glBindAttribLocation(id_, index, name));
   }
 
-  //---------- Uniform ----------//
   GLint getUniform(const std::string &uniformName) {
     if (uniformLocationCache_.find(uniformName) != uniformLocationCache_.end()) {
       return uniformLocationCache_[uniformName];
     }
 
-    const GLint location = glGetUniformLocation(m_GLId, uniformName.c_str());
+    const GLint location = GLCALL(glGetUniformLocation(id_, uniformName.c_str()));
 
 #ifndef NDEBUG
     if(location == -1 && !uniformMissingWarning_[uniformName]) {
@@ -206,17 +201,17 @@ public:
 
   void setInt(const std::string& uniformName, int v) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform1i(loc, v));
+    if(loc != -1) GLCALL(glUniform1i(loc, v));
   }
 
   void setFloat(const std::string& uniformName, float v) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform1f(loc, v));
+    if(loc != -1) GLCALL(glUniform1f(loc, v));
   }
 
   void setVec2f(const std::string& uniformName, const glm::vec2& v) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform2f(loc, v.x, v.y));
+    if(loc != -1) GLCALL(glUniform2f(loc, v.x, v.y));
   }
   void setVec2f(const std::string& uniformName, const std::vector<float>& vec) {
     assert(vec.size() >= 2);
@@ -224,16 +219,16 @@ public:
   }
   void setVec2f(const std::string& uniformName, const float& x, const float& y) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform2f(loc, x, y));
+    if(loc != -1) GLCALL(glUniform2f(loc, x, y));
   }
   void setVec2f(const std::string& uniformName, const float* data) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform2f(loc, data[0], data[1]));
+    if(loc != -1) GLCALL(glUniform2f(loc, data[0], data[1]));
   }
 
   void setVec3f(const std::string& uniformName, const glm::vec3& v) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform3f(loc, v.x, v.y, v.z));
+    if(loc != -1) GLCALL(glUniform3f(loc, v.x, v.y, v.z));
   }
   void setVec3f(const std::string& uniformName, const std::vector<float>& vec) {
     assert(vec.size() >= 3);
@@ -241,11 +236,11 @@ public:
   }
   void setVec3f(const std::string& uniformName, const float* data) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform3f(loc, data[0], data[1], data[2]));
+    if(loc != -1) GLCALL(glUniform3f(loc, data[0], data[1], data[2]));
   }
   void setVec3f(const std::string& uniformName, const float& x, const float& y, const float& z) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform3f(loc, x, y, z));
+    if(loc != -1) GLCALL(glUniform3f(loc, x, y, z));
   }
 
   void setVec4f(const std::string& uniformName, const std::vector<float>& vec) {
@@ -254,24 +249,24 @@ public:
   }
   void setVec4f(const std::string& uniformName, const glm::vec4& v) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform4f(loc, v.x, v.y, v.z, v.w));
+    if(loc != -1) GLCALL(glUniform4f(loc, v.x, v.y, v.z, v.w));
   }
   void setVec4f(const std::string& uniformName, const float* data) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform4f(loc, data[0], data[1], data[2], data[3]));
+    if(loc != -1) GLCALL(glUniform4f(loc, data[0], data[1], data[2], data[3]));
   }
   void setVec4f(const std::string& uniformName, const float& x, const float& y, const float& z, const float& w) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniform4f(loc, x, y, z, w));
+    if(loc != -1) GLCALL(glUniform4f(loc, x, y, z, w));
   }
 
   void setMat3(const std::string& uniformName, const glm::mat3& m) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
+    if(loc != -1) GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
   }
   void setMat4(const std::string& uniformName, const glm::mat4& m) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCall(glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
+    if(loc != -1) GLCALL(glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
   }
 
 };

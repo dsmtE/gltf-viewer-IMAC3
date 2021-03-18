@@ -11,7 +11,7 @@ class GBuffer : public FrameBuffer {
         
         void bindTextures() const;
         void bindTexturesToShader(GLProgram& shaderProgram) const;
-        void render(const glm::ivec2& size) const;
+        void render() const;
 
     private:
         void initScreenTriangle();

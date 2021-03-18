@@ -22,11 +22,10 @@ public:
 	inline const glm::ivec2& size() const { return size_; }
 	inline float aspectRatio() const { return static_cast<float>(size_.x) / static_cast<float>(size_.y); }
 	inline GLuint Id() const { return id_; }
-
-	static char* GLFramebufferStatusToString(GLenum status);
 	
 protected:
 	
 	GLuint id_ = -1;
 	glm::ivec2 size_ = glm::ivec2(0);
+	int saveViewportDim_[4];
 };
