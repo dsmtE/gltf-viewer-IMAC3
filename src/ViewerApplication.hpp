@@ -36,6 +36,12 @@ private:
   std::string m_vertexShader = "pbr.vs.glsl";
   std::string m_fragmentShader = "pbr.fs.glsl";
 
+  std::string geometryPassVShader = "geometryPass.vs.glsl";
+  std::string geometryPassFShader = "geometryPass.fs.glsl";
+
+  std::string shadingPassVShader = "shadingPass.vs.glsl";
+  std::string shadingPassFShader = "shadingPass.fs.glsl";
+
   bool m_hasUserCamera = false;
   Camera m_userCamera;
   int cameraControllerType_ = static_cast<int>(EControllerType::FirstPerson);

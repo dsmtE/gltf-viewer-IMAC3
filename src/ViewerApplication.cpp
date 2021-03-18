@@ -3,6 +3,7 @@
 #include "utils/gltfUtils.hpp"
 #include "utils/images.hpp"
 #include "utils/Texture.hpp"
+#include "utils/GBuffer.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -23,7 +24,10 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
 int ViewerApplication::run() {
   // Loader shaders
-  GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
+  GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / geometryPassVShader, m_ShadersRootPath / geometryPassFShader});
+  GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / shadingPassVShader, m_ShadersRootPath / shadingPassFShader});
+
+  GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
   // load model
   tinygltf::Model model;
@@ -37,7 +41,7 @@ int ViewerApplication::run() {
   const float maxDistance = glm::length(diag);
 
   // Build projection matrix
-  const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
+  const glm::mat4 projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
   
   std::unique_ptr<CameraController> cameraController;
 
@@ -66,8 +70,11 @@ int ViewerApplication::run() {
   float lightIntensity = 1.f;
   
   bool occlusionEnable = true;
+  float occlusionStrength = 0.5f;
   bool normalEnable = true;
   bool tangentAvailable = false;
+
+  int deferredShadingDisplayId = 0;
 
   // used with imgui to recompute LightDir
   float lightTheta = 0.f;
@@ -175,7 +182,6 @@ int ViewerApplication::run() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
     shaderprogram.use();
-
     const glm::mat4 viewMatrix = camera.getViewMatrix();
 
     // send globa lighting uniforms
@@ -243,17 +249,19 @@ int ViewerApplication::run() {
   };
   
   if (!m_OutputPath.empty()) { // if output path provided
-    const GLsizei numComponents = 3;
-    std::vector<unsigned char> pixels(m_nWindowWidth * m_nWindowHeight * numComponents);
-    renderToImage(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), [&]() {
-      drawScene(glslProgram, cameraController->getCamera());
-    });
+    // const GLsizei numComponents = 3;
+    // std::vector<unsigned char> pixels(m_nWindowWidth * m_nWindowHeight * numComponents);
+    // renderToImage(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), [&]() {
+    //   drawScene(glslProgram, cameraController->getCamera());
+    // });
 
-    // flip the Y axis for image formats convention
-    flipImageYAxis(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data());
-    stbi_write_png(m_OutputPath.string().c_str(), m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), 0);
+    // // flip the Y axis for image formats convention
+    // flipImageYAxis(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data());
+    // stbi_write_png(m_OutputPath.string().c_str(), m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), 0);
 
-    std::cout << "Scene render and saved at : " << m_OutputPath.string() << std::endl;
+    // std::cout << "Scene render and saved at : " << m_OutputPath.string() << std::endl;
+
+    std::cout << "Scene render and save not working with deferred rendering currently." << std::endl;
     return 0;
   }
 
@@ -264,10 +272,40 @@ int ViewerApplication::run() {
     const double seconds = glfwGetTime();
 
     const Camera& camera = cameraController->getCamera();
+
     if(shouldDraw) {
       secondLastDraw = seconds;
       shouldDraw = false;
-      drawScene(glslProgram, camera);
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
+
+      // Geometry Pass
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gBuffer.Id());
+
+      geometryPassProgram.use();
+      // uniforms
+      geometryPassProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
+
+      drawScene(geometryPassProgram, camera);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+      // shading/lighting pass
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      
+      shadingPassProgram.use();
+      // view space conversion of lightDirection
+      shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
+      shadingPassProgram.setVec3f("uLightColor", lightColor);
+      shadingPassProgram.setFloat("uLightIntensity", lightIntensity);
+      shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
+      shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
+      gBuffer.bindTexturesToShader(shadingPassProgram);
+
+      gBuffer.render({m_nWindowWidth, m_nWindowHeight});
+
+      // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
+      // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);
     }
 
     // GUI code:
@@ -327,6 +365,33 @@ int ViewerApplication::run() {
         if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
       }
 
+      if (ImGui::CollapsingHeader("Deferred Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::RadioButton("All", &deferredShadingDisplayId, 0)) {
+          deferredShadingDisplayId = 0;
+        }
+        if (ImGui::RadioButton("Position", &deferredShadingDisplayId, 1)) {
+          deferredShadingDisplayId = 1;
+        }
+        if (ImGui::RadioButton("Normal", &deferredShadingDisplayId, 2)) {
+          deferredShadingDisplayId = 2;
+        }
+        if (ImGui::RadioButton("Albedo", &deferredShadingDisplayId, 3)) {
+          deferredShadingDisplayId = 3;
+        }
+        if (ImGui::RadioButton("Roughness", &deferredShadingDisplayId, 4)) {
+          deferredShadingDisplayId = 4;
+        }
+        if (ImGui::RadioButton("Metallic", &deferredShadingDisplayId, 5)) {
+          deferredShadingDisplayId = 5;
+        }
+        if (ImGui::RadioButton("Occlusion", &deferredShadingDisplayId, 6)) {
+          deferredShadingDisplayId = 6;
+        }
+        if (ImGui::RadioButton("Emissive", &deferredShadingDisplayId, 7)) {
+          deferredShadingDisplayId = 7;
+        }
+      }
+      
       ImGui::End();
     }
 
