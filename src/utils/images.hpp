@@ -3,9 +3,7 @@
 #include <functional>
 
 template <typename ComponentType>
-void flipImageYAxis(
-    size_t width, size_t height, size_t numComponent, ComponentType *pixels)
-{
+void flipImageYAxis(size_t width, size_t height, size_t numComponent, ComponentType *pixels) {
   auto *pFirstLine = pixels;
   auto *pLastLine = pixels + (height - 1) * width * numComponent;
 
@@ -17,8 +15,7 @@ void flipImageYAxis(
   }
 }
 
-void renderToImage(size_t width, size_t height, size_t numComponents,
-    unsigned char *outPixels, std::function<void()> drawScene);
+void renderToImage(size_t width, size_t height, size_t numComponents, unsigned char *outPixels, std::function<void()> drawScene);
 // Setup GL state in order to render in texture, call drawScene() then get the
 // texture from the GPU and store it on outPixels[0 : width * height *
 // numComponent]. Then restore the previous GL state.

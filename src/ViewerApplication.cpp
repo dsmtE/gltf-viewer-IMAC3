@@ -3,6 +3,7 @@
 #include "utils/gltfUtils.hpp"
 #include "utils/images.hpp"
 #include "utils/Texture.hpp"
+#include "utils/GBuffer.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -23,7 +24,10 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
 int ViewerApplication::run() {
   // Loader shaders
-  GLProgram glslProgram = compileProgram({m_ShadersRootPath / m_vertexShader, m_ShadersRootPath / m_fragmentShader});
+  GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / geometryPassVShader, m_ShadersRootPath / geometryPassFShader});
+  GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / shadingPassVShader, m_ShadersRootPath / shadingPassFShader});
+
+  GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
   // load model
   tinygltf::Model model;
@@ -37,7 +41,7 @@ int ViewerApplication::run() {
   const float maxDistance = glm::length(diag);
 
   // Build projection matrix
-  const auto projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
+  const glm::mat4 projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
   
   std::unique_ptr<CameraController> cameraController;
 
@@ -66,8 +70,11 @@ int ViewerApplication::run() {
   float lightIntensity = 1.f;
   
   bool occlusionEnable = true;
+  float occlusionStrength = 0.5f;
   bool normalEnable = true;
   bool tangentAvailable = false;
+
+  int deferredShadingDisplayId = 0;
 
   // used with imgui to recompute LightDir
   float lightTheta = 0.f;
@@ -95,22 +102,22 @@ int ViewerApplication::run() {
   std::vector<Texture> textureObjects = gltfUtils::createTextureObjects(model);
 
   // Create white texture for object with no base color texture
-  Texture whiteTexture;
+  Texture whiteTexture({1, 1}, GL_RGBA16F);
   const float white[] = {1, 1, 1, 1};
-  whiteTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, white, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  whiteTexture.upload(GL_RGBA, GL_FLOAT, white, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
-  Texture blackTexture;
+  Texture blackTexture({1, 1}, GL_RGBA16F);
   const float black[] = {0, 0, 0, 1};
-  blackTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  blackTexture.upload(GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
-  Texture bumpTexture;
+  Texture bumpTexture({1, 1}, GL_RGBA16F);
   const float bump[] = {0, 0, 1, 1};
-  bumpTexture.init(1, 1, GL_RGBA, GL_RGBA, GL_FLOAT, bump, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  bumpTexture.upload(GL_RGBA, GL_FLOAT, bump, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
 
-  const std::function<void(const int&)> bindMaterial = [&](const int materialIndex) {
+  const std::function<void(GLProgram&, const int&)> bindMaterial = [&](GLProgram& shaderprogram, const int materialIndex) {
     // default uniforms
     glm::vec4 baseColor(1);
     float metallicFactor = 1;
@@ -133,89 +140,56 @@ int ViewerApplication::run() {
 
       occlusionStrength = (float)material.occlusionTexture.strength;
 
-      if (pbrMetallicRoughness.baseColorTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.baseColorTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
+      const std::array<std::pair<int, std::string>, 5> texturesIdxAndNames = {{
+        {pbrMetallicRoughness.baseColorTexture.index, "uBaseColorTexture"},
+        {material.normalTexture.index, "uNormalTexture"},
+        {pbrMetallicRoughness.metallicRoughnessTexture.index, "uMetallicRoughnessTexture"},
+        {material.occlusionTexture.index, "uOcclusionTexture"},
+        {material.emissiveTexture.index, "uEmissiveTexture"}
+      }};
 
-          textureObject.attachToSlot(0);
-          glslProgram.setInt("uBaseColorTexture", 0);
+      for (int i = 0; i < texturesIdxAndNames.size(); ++i){
+        const int id = texturesIdxAndNames[i].first;
+        const std::string& uName = texturesIdxAndNames[i].second;
+
+        if(id >= 0) {
+          const tinygltf::Texture& texture = model.textures[id];
+          if (texture.source >= 0) {
+            const Texture& textureObject = textureObjects[texture.source];
+            textureObject.attachToShaderSlot(shaderprogram, uName, i);
           }
-      }
-
-      if (pbrMetallicRoughness.metallicRoughnessTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[pbrMetallicRoughness.metallicRoughnessTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToSlot(1);
-          glslProgram.setInt("uMetallicRoughnessTexture", 1);
-          }
-      }
-
-      if (material.emissiveTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.emissiveTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToSlot(2);
-          glslProgram.setInt("uEmissiveTexture", 2);
-          }
-      }
-
-      if (material.emissiveTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.occlusionTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToSlot(3);
-          glslProgram.setInt("uOcclusionTexture", 3);
-          }
-      }
-
-      if (material.normalTexture.index >= 0) {
-        const tinygltf::Texture& texture = model.textures[material.normalTexture.index];
-        if (texture.source >= 0) {
-          const Texture& textureObject = textureObjects[texture.source];
-
-          textureObject.attachToSlot(4);
-          glslProgram.setInt("uNormalTexture", 4);
-          }
+        }
       }
 
     }else {
-      whiteTexture.attachToSlot(0);
-      glslProgram.setInt("uBaseColorTexture", 0);
-
-      blackTexture.attachToSlot(1);
-      glslProgram.setInt("uMetallicRoughnessTexture", 1);
-
-      blackTexture.attachToSlot(2);
-      glslProgram.setInt("uEmissiveTexture", 2);
-
-      whiteTexture.attachToSlot(3);
-      glslProgram.setInt("uOcclusionTexture", 3);
-
-      bumpTexture.attachToSlot(4);
-      glslProgram.setInt("uNormalTexture", 4);
+      whiteTexture.attachToShaderSlot(shaderprogram, "uBaseColorTexture", 0);
+      bumpTexture.attachToShaderSlot(shaderprogram, "uNormalTexture", 1);
+      blackTexture.attachToShaderSlot(shaderprogram, "uMetallicRoughnessTexture", 2);
+      whiteTexture.attachToShaderSlot(shaderprogram, "uOcclusionTexture", 3);
+      blackTexture.attachToShaderSlot(shaderprogram, "uEmissiveTexture", 4);
     }
 
-    glslProgram.setFloat("uMetallicFactor", metallicFactor);
-    glslProgram.setFloat("uRoughnessFactor", roughnessFactor);
-    glslProgram.setVec4f("uBaseColorFactor", baseColor);
-    glslProgram.setVec3f("uEmissiveFactor", emissiveFactor);
-    glslProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
-    glslProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
+    shaderprogram.setVec4f("uBaseColorFactor", baseColor);
+    shaderprogram.setFloat("uMetallicFactor", metallicFactor);
+    shaderprogram.setFloat("uRoughnessFactor", roughnessFactor);
+    shaderprogram.setVec3f("uEmissiveFactor", emissiveFactor);
+    shaderprogram.setFloat("uOcclusionStrength", occlusionStrength);
+    shaderprogram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
   };
 
   // Lambda function to draw the scene
-  const std::function<void(const Camera &)> drawScene = [&](const Camera &camera) {
-    glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
+  const std::function<void(GLProgram&, const Camera &)> drawScene = [&](GLProgram& shaderprogram, const Camera &camera) {    
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    glslProgram.use();
+  
+    shaderprogram.use();
     const glm::mat4 viewMatrix = camera.getViewMatrix();
 
+    // send globa lighting uniforms
+    shaderprogram.setVec3f("uLightColor", lightColor);
+    shaderprogram.setFloat("uLightIntensity", lightIntensity);
+    shaderprogram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
+    shaderprogram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
+  
     // The recursive function that should draw a node
     // We use a std::function because a simple lambda cannot be recursive
     const std::function<void(int, const glm::mat4 &)> drawNode = [&](int nodeIdx, const glm::mat4 &parentMatrix) {
@@ -233,15 +207,9 @@ int ViewerApplication::run() {
         const glm::mat4 normalMatrix = glm::transpose(glm::inverse(mvMatrix));
 
         // send matrix as uniforms
-        glslProgram.setMat4("uModelViewProjMatrix", mvpMatrix);
-        glslProgram.setMat4("uModelViewMatrix", mvMatrix);
-        glslProgram.setMat4("uNormalMatrix", normalMatrix);
-
-        // view space conversion of lightDirection
-        glslProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(viewMatrix * glm::vec4(lightDirection, 0.))));
-        glslProgram.setVec3f("uLightColor", lightColor);
-        glslProgram.setFloat("uLightIntensity", lightIntensity);
-        glslProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
+        shaderprogram.setMat4("uModelViewProjMatrix", mvpMatrix);
+        shaderprogram.setMat4("uModelViewMatrix", mvMatrix);
+        shaderprogram.setMat4("uNormalMatrix", normalMatrix);
 
         // iterate over primitives
         for (size_t i = 0; i < mesh.primitives.size(); ++i) {
@@ -251,7 +219,7 @@ int ViewerApplication::run() {
 
           const tinygltf::Primitive& primitive = mesh.primitives[i];
           
-          bindMaterial(primitive.material);
+          bindMaterial(shaderprogram, primitive.material);
 
           if (primitive.indices >= 0) { // if this primitive uses indices
             const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
@@ -281,17 +249,19 @@ int ViewerApplication::run() {
   };
   
   if (!m_OutputPath.empty()) { // if output path provided
-    const GLsizei numComponents = 3;
-    std::vector<unsigned char> pixels(m_nWindowWidth * m_nWindowHeight * numComponents);
-    renderToImage(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), [&]() {
-      drawScene(cameraController->getCamera());
-    });
+    // const GLsizei numComponents = 3;
+    // std::vector<unsigned char> pixels(m_nWindowWidth * m_nWindowHeight * numComponents);
+    // renderToImage(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), [&]() {
+    //   drawScene(glslProgram, cameraController->getCamera());
+    // });
 
-    // flip the Y axis for image formats convention
-    flipImageYAxis(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data());
-    stbi_write_png(m_OutputPath.string().c_str(), m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), 0);
+    // // flip the Y axis for image formats convention
+    // flipImageYAxis(m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data());
+    // stbi_write_png(m_OutputPath.string().c_str(), m_nWindowWidth, m_nWindowHeight, numComponents, pixels.data(), 0);
 
-    std::cout << "Scene render and saved at : " << m_OutputPath.string() << std::endl;
+    // std::cout << "Scene render and saved at : " << m_OutputPath.string() << std::endl;
+
+    std::cout << "Scene render and save not working with deferred rendering currently." << std::endl;
     return 0;
   }
 
@@ -302,10 +272,40 @@ int ViewerApplication::run() {
     const double seconds = glfwGetTime();
 
     const Camera& camera = cameraController->getCamera();
+
     if(shouldDraw) {
       secondLastDraw = seconds;
       shouldDraw = false;
-      drawScene(camera);
+
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
+
+      // Geometry Pass
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gBuffer.Id());
+
+      geometryPassProgram.use();
+      // uniforms
+      geometryPassProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
+
+      drawScene(geometryPassProgram, camera);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+      // shading/lighting pass
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      
+      shadingPassProgram.use();
+      // view space conversion of lightDirection
+      shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
+      shadingPassProgram.setVec3f("uLightColor", lightColor);
+      shadingPassProgram.setFloat("uLightIntensity", lightIntensity);
+      shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
+      shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
+      gBuffer.bindTexturesToShader(shadingPassProgram);
+
+      gBuffer.render({m_nWindowWidth, m_nWindowHeight});
+
+      // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
+      // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);
     }
 
     // GUI code:
@@ -351,23 +351,47 @@ int ViewerApplication::run() {
           }
           cameraController->setCamera(currentCamera);
         }
-
-        if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-          if (ImGui::SliderFloat("theta", &lightTheta, 0, glm::pi<float>()) || ImGui::SliderFloat("phi", &lightPhi, 0, 2.f * glm::pi<float>())) {
-            // update lightDirection
-            lightDirection = glm::vec3(glm::sin(lightTheta) * glm::cos(lightPhi), glm::cos(lightTheta), glm::sin(lightTheta) * glm::sin(lightPhi));
-          }
-
-          ImGui::ColorEdit3("color", (float *)&lightColor);
-          ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
-          ImGui::Checkbox("light from camera", &lightFromCamera);
-          ImGui::Checkbox("enable occlusion", &occlusionEnable);
-          if(tangentAvailable) {
-            ImGui::Checkbox("enable normal mapping", &normalEnable);
-          }
       }
 
+      if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::SliderFloat("theta", &lightTheta, 0, glm::pi<float>()) || ImGui::SliderFloat("phi", &lightPhi, 0, 2.f * glm::pi<float>())) {
+          lightDirection = glm::vec3(glm::sin(lightTheta) * glm::cos(lightPhi), glm::cos(lightTheta), glm::sin(lightTheta) * glm::sin(lightPhi));
+        }
+
+        ImGui::ColorEdit3("color", (float *)&lightColor);
+        ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
+        ImGui::Checkbox("light from camera", &lightFromCamera);
+        ImGui::Checkbox("enable occlusion", &occlusionEnable);
+        if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
       }
+
+      if (ImGui::CollapsingHeader("Deferred Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::RadioButton("All", &deferredShadingDisplayId, 0)) {
+          deferredShadingDisplayId = 0;
+        }
+        if (ImGui::RadioButton("Position", &deferredShadingDisplayId, 1)) {
+          deferredShadingDisplayId = 1;
+        }
+        if (ImGui::RadioButton("Normal", &deferredShadingDisplayId, 2)) {
+          deferredShadingDisplayId = 2;
+        }
+        if (ImGui::RadioButton("Albedo", &deferredShadingDisplayId, 3)) {
+          deferredShadingDisplayId = 3;
+        }
+        if (ImGui::RadioButton("Roughness", &deferredShadingDisplayId, 4)) {
+          deferredShadingDisplayId = 4;
+        }
+        if (ImGui::RadioButton("Metallic", &deferredShadingDisplayId, 5)) {
+          deferredShadingDisplayId = 5;
+        }
+        if (ImGui::RadioButton("Occlusion", &deferredShadingDisplayId, 6)) {
+          deferredShadingDisplayId = 6;
+        }
+        if (ImGui::RadioButton("Emissive", &deferredShadingDisplayId, 7)) {
+          deferredShadingDisplayId = 7;
+        }
+      }
+      
       ImGui::End();
     }
 
