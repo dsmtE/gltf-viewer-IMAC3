@@ -42,24 +42,21 @@ public:
 	void upload(const GLenum format, const GLenum type, const T* data) {
 		GLCALL(glBindTexture(GL_TEXTURE_2D, textureId_));
 		GLCALL(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size_.x, size_.y, format, type, data));
+		GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
 	}
 
 	template <typename T>
 	void upload(const GLenum format, const GLenum type, const T* data, 
 	GLint minFilter = GL_LINEAR, GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE}) {
 		
+		setup(minFilter, magFilter, wrapsMode);
+		
 		minFilter = minFilter != -1 ? minFilter : GL_LINEAR;
 		magFilter = magFilter != -1 ? magFilter : GL_LINEAR;
 
 		GLCALL(glBindTexture(GL_TEXTURE_2D, textureId_));
-		// GLCALL(glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data));
-		GLCALL(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size_.x, size_.y, format, type, data));
 
-		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter));
-		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
-		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapsMode[0]));
-		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapsMode[1]));
-		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, wrapsMode[2]));
+		GLCALL(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size_.x, size_.y, format, type, data));
 
 		if (minFilter == GL_NEAREST_MIPMAP_NEAREST || minFilter == GL_NEAREST_MIPMAP_LINEAR ||
 			minFilter == GL_LINEAR_MIPMAP_NEAREST || minFilter == GL_LINEAR_MIPMAP_LINEAR) {
@@ -68,6 +65,22 @@ public:
 
 		GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
 	}
+
+	void setup(GLint minFilter = GL_LINEAR, GLint magFilter = GL_LINEAR, const std::array<GLint, 3>& wrapsMode = {GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE}) {
+		minFilter = minFilter != -1 ? minFilter : GL_LINEAR;
+		magFilter = magFilter != -1 ? magFilter : GL_LINEAR;
+
+		GLCALL(glBindTexture(GL_TEXTURE_2D, textureId_));
+
+		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter));
+		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter));
+		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapsMode[0]));
+		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapsMode[1]));
+		GLCALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, wrapsMode[2]));
+
+		GLCALL(glBindTexture(GL_TEXTURE_2D, 0));
+	}
+
 
 	template <typename T>
 	inline void upload(const GLenum format, const GLenum type, const T* data, const tinygltf::Sampler& sampler) {
@@ -81,7 +94,7 @@ public:
 		GLCALL(glBindTexture(GL_TEXTURE_2D, textureId_));
 	}
 
-	void attachToShaderSlot(GLProgram& shaderProgram, const std::string& name, const int slot = 0) const {
+	void attachToShaderSlot(GLProgram& shaderProgram, const char* name, const int slot = 0) const {
 		GLCALL(glActiveTexture(GL_TEXTURE0 + slot));
 		GLCALL(glBindTexture(GL_TEXTURE_2D, textureId_));
 		shaderProgram.setInt(name, slot);

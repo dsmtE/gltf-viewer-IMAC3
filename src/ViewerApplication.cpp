@@ -156,7 +156,7 @@ int ViewerApplication::run() {
           const tinygltf::Texture& texture = model.textures[id];
           if (texture.source >= 0) {
             const Texture& textureObject = textureObjects[texture.source];
-            textureObject.attachToShaderSlot(shaderprogram, uName, i);
+            textureObject.attachToShaderSlot(shaderprogram, uName.c_str(), i);
           }
         }
       }
