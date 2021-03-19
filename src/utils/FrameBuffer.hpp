@@ -8,8 +8,8 @@ public:
 	FrameBuffer(const glm::ivec2& size);
 	virtual ~FrameBuffer();
 
-	void bind();
-	void unbind();
+	void bind(const GLenum target = GL_FRAMEBUFFER);
+	void unbind(const GLenum target = GL_FRAMEBUFFER);
 
 	// Copies the content of this framebuffer to another framebuffer (dstFrameBufferID = 0 by default for screen)
 	void copyTo(const glm::ivec2& botLeft, const glm::ivec2& topRight, const GLbitfield& mask, const GLuint dstFrameBufferID = 0, const GLint interpolationMode = GL_LINEAR);
