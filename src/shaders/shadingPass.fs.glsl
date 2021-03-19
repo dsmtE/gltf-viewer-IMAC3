@@ -1,18 +1,20 @@
-#version 330
+#version 420
 
 uniform vec3 uLightDirection;
 uniform vec3 uLightColor;
 uniform float uLightIntensity;
 uniform float uOcclusionStrength;
+uniform int uEnableSSAO;
 
 uniform int uDeferredShadingDisplayId;
 
 // Deferred shading (already in view space)
-uniform sampler2D uGPosition;
-uniform sampler2D uGNormal;
-uniform sampler2D uGAlbedo;
-uniform sampler2D uGOcclusionRoughnessMetallic;
-uniform sampler2D uGEmissive;
+layout(binding=0) uniform sampler2D uGPosition;
+layout(binding=1) uniform sampler2D uGNormal;
+layout(binding=2) uniform sampler2D uGAlbedo;
+layout(binding=3) uniform sampler2D uGOcclusionRoughnessMetallic;
+layout(binding=4) uniform sampler2D uGEmissive;
+layout(binding=5) uniform sampler2D uSSAO;
 
 out vec3 fColor;
 
@@ -99,12 +101,14 @@ void main() {
   vec3 specular = (D * G * F) / max(4.0 * NdotV * NdotL, 0.001);  
 
   vec3 diffuse = baseColor * (1 - metallic) * (1- F) / PI;    
-
-
+  
   vec3 color = (diffuse + specular) * radiance * NdotL + emissive;
 
-  // uOcclusionStrength == 0 mean no occlusion
   color = mix(color, color * occlusion, uOcclusionStrength);
+
+  // SSAO
+  float ssao = texelFetch(uSSAO, ivec2(gl_FragCoord.xy), 0).r;
+  if(uEnableSSAO > 0) color *= ssao;
 
   color = linear2srgb(color);
 
@@ -113,7 +117,7 @@ void main() {
       // nothing show all
       break;
     case 1:
-      color = position;
+      color = (position + 0.5) / 2;
       break;
     case 2:
       color = N;
@@ -132,6 +136,9 @@ void main() {
       break;
     case 7:
       color = emissive;
+      break;
+    case 8:
+      color = vec3(ssao);
       break;
   }
 

@@ -28,10 +28,7 @@ positionTex_(size, GL_RGBA16F), normalTex_(size, GL_RGBA16F), albedoTex_(size, G
 	if (status != GL_FRAMEBUFFER_COMPLETE)
 		std::cerr << "Framebuffer is not complete : " << glEnumToStr::find(glEnumToStr::framebufferStatus, status) << std::endl;
 
-	GLCALL(glBindRenderbuffer(GL_RENDERBUFFER, 0));
-
     unbind();
-
     GLCALL(glGenVertexArrays(1, &screenVAO_));
 }
 

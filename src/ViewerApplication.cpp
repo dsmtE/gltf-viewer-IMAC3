@@ -4,6 +4,8 @@
 #include "utils/images.hpp"
 #include "utils/Texture.hpp"
 #include "utils/GBuffer.hpp"
+#include "utils/SSAOFrameBuffer.hpp"
+#include "utils/TextureFB.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -26,8 +28,14 @@ int ViewerApplication::run() {
   // Loader shaders
   GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / geometryPassVShader, m_ShadersRootPath / geometryPassFShader});
   GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / shadingPassVShader, m_ShadersRootPath / shadingPassFShader});
+  GLProgram ssaoPassProgramm = compileProgram({m_ShadersRootPath / ssaoPassVShader, m_ShadersRootPath / ssaoPassFShader});
+  GLProgram ssaoBlurPassProgram = compileProgram({m_ShadersRootPath / ssaoPassVShader, m_ShadersRootPath / ssaoBlurPassFShader});
 
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
+
+  SSAOFrameBuffer ssaoFB({m_nWindowWidth, m_nWindowHeight});
+
+  TextureFB SSAOBlurFB({m_nWindowWidth, m_nWindowHeight}, GL_R16F);
 
   // load model
   tinygltf::Model model;
@@ -70,6 +78,7 @@ int ViewerApplication::run() {
   float lightIntensity = 1.f;
   
   bool occlusionEnable = true;
+  bool SSAOEnable = true;
   float occlusionStrength = 0.5f;
   bool normalEnable = true;
   bool tangentAvailable = false;
@@ -273,32 +282,59 @@ int ViewerApplication::run() {
       secondLastDraw = seconds;
       shouldDraw = false;
 
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
-
       // Geometry Pass
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gBuffer.Id());
+      gBuffer.bind(GL_DRAW_FRAMEBUFFER);
 
       geometryPassProgram.use();
-      // uniforms
       geometryPassProgram.setInt("uNormalEnable", tangentAvailable && normalEnable ? 1 : 0);
-
       drawScene(geometryPassProgram, camera);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-      // shading/lighting pass
+      gBuffer.unbind(GL_DRAW_FRAMEBUFFER);
+
+      // SSAO Pass
+      ssaoFB.bind(GL_DRAW_FRAMEBUFFER);
+
+      GLCALL(glClear(GL_COLOR_BUFFER_BIT));
+      ssaoPassProgramm.use();
+      ssaoPassProgramm.setMat4("uProjMatrix", projMatrix);
+      ssaoFB.sendUniforms(ssaoPassProgramm);
+      gBuffer.bindTexturesToShader(ssaoPassProgramm);
+      gBuffer.render(); // TODO use better location for screenRender VAO trick
+
+      ssaoFB.unbind(GL_DRAW_FRAMEBUFFER);
+
+      // SSAO Blur
+      SSAOBlurFB.bind(GL_DRAW_FRAMEBUFFER);
+
+      GLCALL(glClear(GL_COLOR_BUFFER_BIT));
+      ssaoBlurPassProgram.use();
+      ssaoFB.bindTexture(0);
+      ssaoBlurPassProgram.setInt("uSSAO", 0);
+      gBuffer.render();
+
+      SSAOBlurFB.unbind(GL_DRAW_FRAMEBUFFER);
+
+      // if (deferredShadingDisplayId == 0) {
+
+      // shading/lighting Pass
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       
       shadingPassProgram.use();
-      // view space conversion of lightDirection
       shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
       shadingPassProgram.setVec3f("uLightColor", lightColor);
       shadingPassProgram.setFloat("uLightIntensity", lightIntensity);
       shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
       shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
+      shadingPassProgram.setInt("uEnableSSAO", SSAOEnable ? 1 : 0);
       gBuffer.bindTexturesToShader(shadingPassProgram);
+      SSAOBlurFB.bindTexture(5);
+      shadingPassProgram.setInt("uSSAO", 5);
 
       gBuffer.render();
+      // } else {
+      //   // copy directly wanted texture without shadingPass
+      //   gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-1);
+      // }
 
       // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
       // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);
@@ -357,35 +393,16 @@ int ViewerApplication::run() {
         ImGui::ColorEdit3("color", (float *)&lightColor);
         ImGui::SliderFloat("intensity", &lightIntensity, 0.f, 10.f);
         ImGui::Checkbox("light from camera", &lightFromCamera);
-        ImGui::Checkbox("enable occlusion", &occlusionEnable);
-        if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
       }
 
-      if (ImGui::CollapsingHeader("Deferred Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
-        if (ImGui::RadioButton("All", &deferredShadingDisplayId, 0)) {
-          deferredShadingDisplayId = 0;
-        }
-        if (ImGui::RadioButton("Position", &deferredShadingDisplayId, 1)) {
-          deferredShadingDisplayId = 1;
-        }
-        if (ImGui::RadioButton("Normal", &deferredShadingDisplayId, 2)) {
-          deferredShadingDisplayId = 2;
-        }
-        if (ImGui::RadioButton("Albedo", &deferredShadingDisplayId, 3)) {
-          deferredShadingDisplayId = 3;
-        }
-        if (ImGui::RadioButton("Roughness", &deferredShadingDisplayId, 4)) {
-          deferredShadingDisplayId = 4;
-        }
-        if (ImGui::RadioButton("Metallic", &deferredShadingDisplayId, 5)) {
-          deferredShadingDisplayId = 5;
-        }
-        if (ImGui::RadioButton("Occlusion", &deferredShadingDisplayId, 6)) {
-          deferredShadingDisplayId = 6;
-        }
-        if (ImGui::RadioButton("Emissive", &deferredShadingDisplayId, 7)) {
-          deferredShadingDisplayId = 7;
-        }
+      if (ImGui::CollapsingHeader("Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
+        static const char* DeferredShadingModes[]{"All", "Position", "Normal", "Albedo", "Roughness", "Metallic", "Occlusion", "Emissive", "SSAO Occlusion"};
+        ImGui::Combo("Deferred display textures", &deferredShadingDisplayId, DeferredShadingModes, 9);
+
+        ImGui::Checkbox("enable occlusion", &occlusionEnable);
+        ImGui::Checkbox("enable SSAO", &SSAOEnable);
+        if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
+        if(SSAOEnable) ssaoFB.imguiMenu();
       }
       
       ImGui::End();

@@ -14,7 +14,6 @@ class GBuffer : public FrameBuffer {
         void render() const;
 
     private:
-        void initScreenTriangle();
 
         Texture positionTex_;
         Texture normalTex_;
@@ -26,6 +25,4 @@ class GBuffer : public FrameBuffer {
 
         // Rendering triangle covering the whole screen, for the shading pass:
         GLuint screenVAO_ = -1;
-        
 };
-

@@ -1,6 +1,4 @@
-#version 430
-
-//out vec2 vTexCoords;
+#version 420
 
 void main() {
     // We use a smart trick explained here https://stackoverflow.com/a/59739538

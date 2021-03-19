@@ -42,6 +42,10 @@ private:
   std::string shadingPassVShader = "shadingPass.vs.glsl";
   std::string shadingPassFShader = "shadingPass.fs.glsl";
 
+  std::string ssaoPassVShader = "ssaoPass.vs.glsl";
+  std::string ssaoPassFShader = "ssaoPass.fs.glsl";
+  std::string ssaoBlurPassFShader = "ssaoBlurPass.fs.glsl";
+
   bool m_hasUserCamera = false;
   Camera m_userCamera;
   int cameraControllerType_ = static_cast<int>(EControllerType::FirstPerson);
