@@ -199,72 +199,55 @@ public:
     return location;
   }
 
-  void setInt(const std::string& uniformName, int v) {
+  void setInt(const char* uniformName, const int value) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform1i(loc, v));
+    if(loc != -1) GLCALL(glUniform1i(loc, value));
   }
 
-  void setFloat(const std::string& uniformName, float v) {
+  void setFloat(const char* uniformName, const float value) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform1f(loc, v));
+    if(loc != -1) GLCALL(glUniform1f(loc, value));
+  }
+  void setFloat(const char* uniformName, const float* values, const size_t& size) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) GLCALL(glUniform1fv(loc, static_cast<GLsizei>(size), values));
   }
 
-  void setVec2f(const std::string& uniformName, const glm::vec2& v) {
-    const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform2f(loc, v.x, v.y));
-  }
-  void setVec2f(const std::string& uniformName, const std::vector<float>& vec) {
-    assert(vec.size() >= 2);
-    setVec3f(uniformName, vec.data());
-  }
-  void setVec2f(const std::string& uniformName, const float& x, const float& y) {
+  void setVec2f(const char* uniformName, const float& x, const float& y) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) GLCALL(glUniform2f(loc, x, y));
   }
-  void setVec2f(const std::string& uniformName, const float* data) {
+  inline void setVec2f(const char* uniformName, const glm::vec2& value) { setVec2f(uniformName, value.x, value.y); }
+  void setVec2f(const char* uniformName, const glm::vec2* values, const size_t& size) {
     const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform2f(loc, data[0], data[1]));
+    if(loc != -1) GLCALL(glUniform2fv(loc, 2 * static_cast<GLsizei>(size), reinterpret_cast<const float*>(values)));
   }
 
-  void setVec3f(const std::string& uniformName, const glm::vec3& v) {
-    const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform3f(loc, v.x, v.y, v.z));
-  }
-  void setVec3f(const std::string& uniformName, const std::vector<float>& vec) {
-    assert(vec.size() >= 3);
-    setVec3f(uniformName, vec.data());
-  }
-  void setVec3f(const std::string& uniformName, const float* data) {
-    const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform3f(loc, data[0], data[1], data[2]));
-  }
-  void setVec3f(const std::string& uniformName, const float& x, const float& y, const float& z) {
+  void setVec3f(const char* uniformName, const float& x, const float& y, const float& z) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) GLCALL(glUniform3f(loc, x, y, z));
   }
+  inline void setVec3f(const char* uniformName, const glm::vec3& value) { setVec3f(uniformName, value.x, value.y, value.z); }
+  void setVec3f(const char* uniformName, const glm::vec3* values, const size_t& size) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) GLCALL(glUniform3fv(loc, 3 * static_cast<GLsizei>(size), reinterpret_cast<const float*>(values)));
+  }
 
-  void setVec4f(const std::string& uniformName, const std::vector<float>& vec) {
-    assert(vec.size() >= 4);
-    setVec4f(uniformName, vec.data());
-  }
-  void setVec4f(const std::string& uniformName, const glm::vec4& v) {
-    const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform4f(loc, v.x, v.y, v.z, v.w));
-  }
-  void setVec4f(const std::string& uniformName, const float* data) {
-    const GLuint loc = getUniform(uniformName);
-    if(loc != -1) GLCALL(glUniform4f(loc, data[0], data[1], data[2], data[3]));
-  }
-  void setVec4f(const std::string& uniformName, const float& x, const float& y, const float& z, const float& w) {
+  void setVec4f(const char* uniformName, const float& x, const float& y, const float& z, const float& w) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) GLCALL(glUniform4f(loc, x, y, z, w));
   }
+  inline void setVec4f(const char* uniformName, const glm::vec4& value) { setVec4f(uniformName, value.x, value.y, value.z, value.w); }
+  void setVec4f(const char* uniformName, const glm::vec4* values, const size_t& size) {
+    const GLuint loc = getUniform(uniformName);
+    if(loc != -1) GLCALL(glUniform4fv(loc, 4 * static_cast<GLsizei>(size), reinterpret_cast<const float*>(values)));
+  }
 
-  void setMat3(const std::string& uniformName, const glm::mat3& m) {
+  void setMat3(const char* uniformName, const glm::mat3& m) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) GLCALL(glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
   }
-  void setMat4(const std::string& uniformName, const glm::mat4& m) {
+  void setMat4(const char* uniformName, const glm::mat4& m) {
     const GLuint loc = getUniform(uniformName);
     if(loc != -1) GLCALL(glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m)));
   }
