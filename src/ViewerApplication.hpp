@@ -31,20 +31,9 @@ private:
   const fs::path m_AppPath;
   const std::string m_AppName;
   const fs::path m_ShadersRootPath;
+  const fs::path m_AssetsRootPath;
 
   fs::path m_gltfFilePath;
-  std::string m_vertexShader = "pbr.vs.glsl";
-  std::string m_fragmentShader = "pbr.fs.glsl";
-
-  std::string geometryPassVShader = "geometryPass.vs.glsl";
-  std::string geometryPassFShader = "geometryPass.fs.glsl";
-
-  std::string shadingPassVShader = "shadingPass.vs.glsl";
-  std::string shadingPassFShader = "shadingPass.fs.glsl";
-
-  std::string ssaoPassVShader = "ssaoPass.vs.glsl";
-  std::string ssaoPassFShader = "ssaoPass.fs.glsl";
-  std::string ssaoBlurPassFShader = "ssaoBlurPass.fs.glsl";
 
   bool m_hasUserCamera = false;
   Camera m_userCamera;

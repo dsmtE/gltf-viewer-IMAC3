@@ -5,6 +5,7 @@ uniform vec3 uLightColor;
 uniform float uLightIntensity;
 uniform float uOcclusionStrength;
 uniform int uEnableSSAO;
+uniform int uEnableIBL;
 
 uniform int uDeferredShadingDisplayId;
 
@@ -15,6 +16,8 @@ layout(binding=2) uniform sampler2D uGAlbedo;
 layout(binding=3) uniform sampler2D uGOcclusionRoughnessMetallic;
 layout(binding=4) uniform sampler2D uGEmissive;
 layout(binding=5) uniform sampler2D uSSAO;
+
+layout(binding=6) uniform samplerCube irradianceMap;
 
 out vec3 fColor;
 
@@ -34,8 +37,12 @@ float speedPow5(float x) {
   return x * sqrX * sqrX;
 }
 
-vec3 fresnelSchlick(float vDotH, vec3 F0) {
-  return F0 + (1 - F0) * speedPow5(saturate(1 - vDotH));
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+  return F0 + (1 - F0) * speedPow5(saturate(1 - cosTheta));
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) * speedPow5(saturate(1 - cosTheta));
 }  
 
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
@@ -78,7 +85,7 @@ void main() {
 
   vec3 radiance = uLightColor * uLightIntensity;
 
-  vec3 baseColor = texelFetch(uGAlbedo, ivec2(gl_FragCoord.xy), 0).xyz;
+  vec3 albedo = texelFetch(uGAlbedo, ivec2(gl_FragCoord.xy), 0).xyz;
   vec3 occlusionRoughnessMetallic = texelFetch(uGOcclusionRoughnessMetallic, ivec2(gl_FragCoord.xy), 0).xyz;
   float occlusion = occlusionRoughnessMetallic.r;
   float roughness = occlusionRoughnessMetallic.g;
@@ -87,25 +94,35 @@ void main() {
 
   vec3 dielectricSpecular = vec3(0.04);
   // base reflectivity 
-  vec3 F0 = mix(vec3(dielectricSpecular), baseColor, metallic);
+  vec3 F0 = mix(vec3(dielectricSpecular), albedo, metallic);
 
   // cook-torrance brdf
   // source : https://learnopengl.com/PBR/Lighting
   float D = DistributionGGX(N, H, roughness);        
   float G = GeometrySmith(N, V, L, roughness);      
   vec3 F = fresnelSchlick(saturate(dot(H, V)), F0);  
+  vec3 kD = (1 - metallic) * (1 - F);
 
   float NdotL = saturate(dot(N, L));
   float NdotV = saturate(dot(N, V));
   
   vec3 specular = (D * G * F) / max(4.0 * NdotV * NdotL, 0.001);  
 
-  vec3 diffuse = baseColor * (1 - metallic) * (1- F) / PI;    
-  
-  vec3 color = (diffuse + specular) * radiance * NdotL + emissive;
+  vec3 diffuse = kD * albedo / PI;    
+
+  // light radiance
+  vec3 color = (diffuse + specular) * radiance * NdotL;
+
+  vec3 ambient = vec3(0.002);
+
+  if(uEnableIBL > 0) {
+    // ambient lighting (we now use IBL as the ambient term)
+    vec3 irradiance = texture(irradianceMap, N).rgb;
+    ambient = (1 - metallic) * (1 - fresnelSchlickRoughness(NdotV, F0, roughness)) * albedo * irradiance;
+  }
+  color += ambient;
 
   color = mix(color, color * occlusion, uOcclusionStrength);
-
   // SSAO
   float ssao = texelFetch(uSSAO, ivec2(gl_FragCoord.xy), 0).r;
   if(uEnableSSAO > 0) color *= ssao;
@@ -123,7 +140,7 @@ void main() {
       color = N;
       break;
     case 3:
-      color = baseColor;
+      color = albedo;
       break;
     case 4:
       color = vec3(roughness);

@@ -6,6 +6,7 @@
 #include "utils/GBuffer.hpp"
 #include "utils/SSAOFrameBuffer.hpp"
 #include "utils/TextureFB.hpp"
+#include "utils/CubeMap.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -26,16 +27,31 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
 int ViewerApplication::run() {
   // Loader shaders
-  GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / geometryPassVShader, m_ShadersRootPath / geometryPassFShader});
-  GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / shadingPassVShader, m_ShadersRootPath / shadingPassFShader});
-  GLProgram ssaoPassProgramm = compileProgram({m_ShadersRootPath / ssaoPassVShader, m_ShadersRootPath / ssaoPassFShader});
-  GLProgram ssaoBlurPassProgram = compileProgram({m_ShadersRootPath / ssaoPassVShader, m_ShadersRootPath / ssaoBlurPassFShader});
+  GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / "geometryPass.vs.glsl", m_ShadersRootPath / "geometryPass.fs.glsl"});
+  GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "shadingPass.fs.glsl"});
+  GLProgram ssaoPassProgramm = compileProgram({m_ShadersRootPath / "ssaoPass.vs.glsl", m_ShadersRootPath / "ssaoPass.fs.glsl"});
+  GLProgram ssaoBlurPassProgram = compileProgram({m_ShadersRootPath / "ssaoPass.vs.glsl", m_ShadersRootPath / "ssaoBlurPass.fs.glsl"});
+
+  GLProgram cubeMapPassProgram = compileProgram({m_ShadersRootPath / "cubeMap.vs.glsl", m_ShadersRootPath / "cubeMap.fs.glsl"});
 
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
   SSAOFrameBuffer ssaoFB({m_nWindowWidth, m_nWindowHeight});
 
   TextureFB SSAOBlurFB({m_nWindowWidth, m_nWindowHeight}, GL_R16F);
+
+  CubeMap skyBox;
+  
+  const std::array<std::string, 6> facesPaths = {
+    (m_AssetsRootPath / "skybox" / "right.jpg").string(),
+    (m_AssetsRootPath / "skybox" / "left.jpg").string(), 
+    (m_AssetsRootPath / "skybox" / "top.jpg").string(), 
+    (m_AssetsRootPath / "skybox" / "bottom.jpg").string(), 
+    (m_AssetsRootPath / "skybox" / "front.jpg").string(), 
+    (m_AssetsRootPath / "skybox" / "back.jpg").string()
+  };
+  
+  skyBox.upload(facesPaths);
 
   // load model
   tinygltf::Model model;
@@ -79,6 +95,7 @@ int ViewerApplication::run() {
   
   bool occlusionEnable = true;
   bool SSAOEnable = true;
+  bool IBLEnable = true;
   float occlusionStrength = 0.5f;
   bool normalEnable = true;
   bool tangentAvailable = false;
@@ -326,9 +343,13 @@ int ViewerApplication::run() {
       shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
       shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
       shadingPassProgram.setInt("uEnableSSAO", SSAOEnable ? 1 : 0);
+      shadingPassProgram.setInt("uEnableIBL",IBLEnable ? 1 : 0);
       gBuffer.bindTexturesToShader(shadingPassProgram);
       SSAOBlurFB.bindTexture(5);
       shadingPassProgram.setInt("uSSAO", 5);
+
+      skyBox.bindTexture(6);
+      ssaoBlurPassProgram.setInt("irradianceMap", 6);
 
       gBuffer.render();
       // } else {
@@ -401,6 +422,8 @@ int ViewerApplication::run() {
 
         ImGui::Checkbox("enable occlusion", &occlusionEnable);
         ImGui::Checkbox("enable SSAO", &SSAOEnable);
+        ImGui::Checkbox("enable IBL", &IBLEnable);
+        
         if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
         if(SSAOEnable) ssaoFB.imguiMenu();
       }
@@ -439,6 +462,7 @@ ViewerApplication::ViewerApplication(const fs::path &appPath, uint32_t width,
     m_AppName{m_AppPath.stem().string()},
     m_ImGuiIniFilename{m_AppName + ".imgui.ini"},
     m_ShadersRootPath{m_AppPath.parent_path() / "shaders"},
+    m_AssetsRootPath{m_AppPath.parent_path() / "assets"},
     m_gltfFilePath{gltfFile},
     m_OutputPath{output}
 {
@@ -448,14 +472,6 @@ ViewerApplication::ViewerApplication(const fs::path &appPath, uint32_t width,
         Camera{glm::vec3(lookatArgs[0], lookatArgs[1], lookatArgs[2]),
             glm::vec3(lookatArgs[3], lookatArgs[4], lookatArgs[5]),
             glm::vec3(lookatArgs[6], lookatArgs[7], lookatArgs[8])};
-  }
-
-  if (!vertexShader.empty()) {
-    m_vertexShader = vertexShader;
-  }
-
-  if (!fragmentShader.empty()) {
-    m_fragmentShader = fragmentShader;
   }
 
   // At exit, ImGUI will store its windows positions in this file
