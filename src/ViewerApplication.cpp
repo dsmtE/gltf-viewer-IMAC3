@@ -333,7 +333,7 @@ int ViewerApplication::run() {
 
       if (deferredShadingDisplayId <= 1) {
         // shading/lighting Pass
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        GLCALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
         
         shadingPassProgram.use();
         shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
@@ -351,6 +351,23 @@ int ViewerApplication::run() {
         ssaoBlurPassProgram.setInt("irradianceMap", 6);
 
         gBuffer.render();
+
+        // draw skybox as last only if we are not in the overlay mode
+        if(deferredShadingDisplayId != 1) {
+          // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
+          gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT, 0, GL_NEAREST);
+
+          GLCALL(glDepthFunc(GL_LEQUAL));  // change depth function so depth test passes when values are equal to depth buffer's content
+          cubeMapPassProgram.use();
+          cubeMapPassProgram.setMat4("ViewMatrix", camera.getViewMatrix());
+          cubeMapPassProgram.setMat4("ProjMatrix", projMatrix);
+          skyBox.bindTexture(0);
+          cubeMapPassProgram.setInt("cubeMap", 0);
+
+          skyBox.draw();
+          GLCALL(glDepthMask(GL_LESS)); // set depth function back to default
+        }
+
       }else if (deferredShadingDisplayId <= 6) {
         // copy directly wanted texture without shadingPass
         gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-2);

@@ -50,7 +50,6 @@ public:
 
     void draw() const {
         GLCALL(glBindVertexArray(cubeVao_));
-        GLCALL(glBindTexture(GL_TEXTURE_CUBE_MAP, textureId_));
         GLCALL(glDrawElements(GL_TRIANGLES,36, GL_UNSIGNED_SHORT, 0));
         GLCALL(glBindVertexArray(0));
     }
