@@ -20,6 +20,7 @@ layout(binding=5) uniform sampler2D uSSAO;
 layout(binding=6) uniform samplerCube irradianceMap;
 
 out vec3 fColor;
+in vec2 vTexCoords;
 
 // ----- Useful constants ----- //
 #define PI  3.14159265358979323846264338327
@@ -125,39 +126,44 @@ void main() {
   color = mix(color, color * occlusion, uOcclusionStrength);
   // SSAO
   float ssao = texelFetch(uSSAO, ivec2(gl_FragCoord.xy), 0).r;
-  if(uEnableSSAO > 0) color *= ssao;
+  color *= float(uEnableSSAO) * ssao;
 
   color = linear2srgb(color);
 
-  switch (uDeferredShadingDisplayId) {
-    case 0:
-      // nothing show all
-      break;
-    case 1:
-      color = (position + 0.5) / 2;
-      break;
-    case 2:
-      color = N;
-      break;
-    case 3:
-      color = albedo;
-      break;
-    case 4:
-      color = vec3(roughness);
-      break;
-    case 5:
-      color = vec3(metallic);
-      break;
-    case 6:
-      color = vec3(occlusion);
-      break;
-    case 7:
-      color = emissive;
-      break;
-    case 8:
-      color = vec3(ssao);
-      break;
+  if(uDeferredShadingDisplayId == 1) { // overlay mode
+    int textureID = int(vTexCoords.x*3) + int(3) * int((1-vTexCoords.y)*3);
+    switch (textureID) {
+      case 0:
+        // nothing show all
+        break;
+      case 1:
+        color = position;
+        // color = (position + 0.5) / 2;
+        break;
+      case 2:
+        color = N;
+        break;
+      case 3:
+        color = albedo;
+        break;
+      case 4:
+        color = vec3(roughness);
+        break;
+      case 5:
+        color = vec3(metallic);
+        break;
+      case 6:
+        color = vec3(occlusion);
+        break;
+      case 7:
+        color = emissive;
+        break;
+      case 8:
+        color = vec3(ssao);
+        break;
+    }
   }
+
 
   fColor = color;
 }

@@ -331,31 +331,33 @@ int ViewerApplication::run() {
 
       SSAOBlurFB.unbind(GL_DRAW_FRAMEBUFFER);
 
-      // if (deferredShadingDisplayId == 0) {
+      if (deferredShadingDisplayId <= 1) {
+        // shading/lighting Pass
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        shadingPassProgram.use();
+        shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
+        shadingPassProgram.setVec3f("uLightColor", lightColor);
+        shadingPassProgram.setFloat("uLightIntensity", lightIntensity);
+        shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
+        shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
+        shadingPassProgram.setInt("uEnableSSAO", SSAOEnable ? 1 : 0);
+        shadingPassProgram.setInt("uEnableIBL",IBLEnable ? 1 : 0);
+        gBuffer.bindTexturesToShader(shadingPassProgram);
+        SSAOBlurFB.bindTexture(5);
+        shadingPassProgram.setInt("uSSAO", 5);
 
-      // shading/lighting Pass
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      
-      shadingPassProgram.use();
-      shadingPassProgram.setVec3f("uLightDirection", lightFromCamera ? glm::vec3(0, 0, 1) : glm::normalize(glm::vec3(camera.getViewMatrix() * glm::vec4(lightDirection, 0.))));
-      shadingPassProgram.setVec3f("uLightColor", lightColor);
-      shadingPassProgram.setFloat("uLightIntensity", lightIntensity);
-      shadingPassProgram.setFloat("uOcclusionStrength", occlusionEnable ? occlusionStrength : 0);
-      shadingPassProgram.setInt("uDeferredShadingDisplayId", deferredShadingDisplayId);
-      shadingPassProgram.setInt("uEnableSSAO", SSAOEnable ? 1 : 0);
-      shadingPassProgram.setInt("uEnableIBL",IBLEnable ? 1 : 0);
-      gBuffer.bindTexturesToShader(shadingPassProgram);
-      SSAOBlurFB.bindTexture(5);
-      shadingPassProgram.setInt("uSSAO", 5);
+        skyBox.bindTexture(6);
+        ssaoBlurPassProgram.setInt("irradianceMap", 6);
 
-      skyBox.bindTexture(6);
-      ssaoBlurPassProgram.setInt("irradianceMap", 6);
-
-      gBuffer.render();
-      // } else {
-      //   // copy directly wanted texture without shadingPass
-      //   gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-1);
-      // }
+        gBuffer.render();
+      }else if (deferredShadingDisplayId <= 6) {
+        // copy directly wanted texture without shadingPass
+        gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-2);
+      }else {
+        // SSAO Occlusion
+        SSAOBlurFB.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, 0);
+      }
 
       // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
       // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);
@@ -417,8 +419,8 @@ int ViewerApplication::run() {
       }
 
       if (ImGui::CollapsingHeader("Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
-        static const char* DeferredShadingModes[]{"All", "Position", "Normal", "Albedo", "Roughness", "Metallic", "Occlusion", "Emissive", "SSAO Occlusion"};
-        ImGui::Combo("Deferred display textures", &deferredShadingDisplayId, DeferredShadingModes, 9);
+        static const char* DeferredShadingModes[]{"All", "Overlay", "Position", "Normal", "Albedo", "Occlusion/Roughness/Metallic", "Emissive", "SSAO Occlusion"};
+        ImGui::Combo("Deferred display textures", &deferredShadingDisplayId, DeferredShadingModes, 8);
 
         ImGui::Checkbox("enable occlusion", &occlusionEnable);
         ImGui::Checkbox("enable SSAO", &SSAOEnable);

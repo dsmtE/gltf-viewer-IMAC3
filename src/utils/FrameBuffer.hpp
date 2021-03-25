@@ -16,6 +16,7 @@ public:
 	inline void copyTo(const FrameBuffer& frameBuffer, const GLbitfield& mask, GLint interpolationMode = GL_LINEAR) {
         copyTo({0, 0}, frameBuffer.size(), mask, frameBuffer.id_, interpolationMode);
     }
+	void copyToFromSlot(const glm::ivec2& botLeft, const glm::ivec2& topRight, const GLbitfield& mask, const int slot = 0, const GLuint dstFrameBufferID = 0, const GLint interpolationMode = GL_LINEAR);
 
 	inline int width() const { return size_.x; }
 	inline int height() const { return size_.y; }

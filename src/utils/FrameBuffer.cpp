@@ -24,9 +24,16 @@ void FrameBuffer::unbind(const GLenum target) {
 }
 
 void FrameBuffer::copyTo(const glm::ivec2& botLeft, const glm::ivec2& topRight, const GLbitfield& mask, const GLuint dstFrameBufferID, const GLint interpolationMode) {
-	bind(GL_DRAW_FRAMEBUFFER);
-	GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, id_));
+	bind(GL_READ_FRAMEBUFFER);
+	GLCALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dstFrameBufferID));
 	GLCALL(glBlitFramebuffer(0, 0, width(), height(), botLeft.x, botLeft.y, topRight.x, topRight.y, mask, interpolationMode));
-	unbind(GL_DRAW_FRAMEBUFFER);
+	unbind(GL_READ_FRAMEBUFFER);
 }
+
+void FrameBuffer::copyToFromSlot(const glm::ivec2& botLeft, const glm::ivec2& topRight, const GLbitfield& mask, const int slot, const GLuint dstFrameBufferID, const GLint interpolationMode) {
+	bind(GL_READ_FRAMEBUFFER);
+	GLCALL(glReadBuffer(GL_COLOR_ATTACHMENT0 + slot));
+	GLCALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dstFrameBufferID));
+	GLCALL(glBlitFramebuffer(0, 0, width(), height(), botLeft.x, botLeft.y, topRight.x, topRight.y, mask, interpolationMode));
+	unbind(GL_READ_FRAMEBUFFER);
 }
