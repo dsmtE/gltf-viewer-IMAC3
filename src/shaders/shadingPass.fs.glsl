@@ -76,22 +76,59 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 }
 
 void main() {
-  // retrive Gbuffers data using texelFetch
-  vec3 position = texelFetch(uGPosition, ivec2(gl_FragCoord.xy), 0).xyz;
 
-  vec3 N = texelFetch(uGNormal, ivec2(gl_FragCoord.xy), 0).xyz;
+    vec2 uv = vTexCoords;
+    int displayId = 0;
+
+    // custom overlay mode
+    if(uDeferredShadingDisplayId == 1) { // overlay mode
+      if(uv.x > 0.75) {
+        if(uv.y > 0.75) {
+          // upper right corner
+          uv -= 0.75;
+          uv /= 0.25;
+          displayId = 4;
+        } else {
+          // bottom right section
+          int id = int(uv.y * 4);
+
+          uv.x -= 0.75;
+          uv.y -= 0.25 * float(id);
+          uv /= 0.25;
+          displayId = 7 - id;
+        }
+      } else {
+        if(uv.y > 0.75) {
+          // upper left section
+          int id = int(uv.x * 4);
+          uv.y -= 0.75;
+          uv.x -= 0.25 * float(id);
+          uv /= 0.25;
+          displayId = 1 + id;
+        } else {
+          // bottom left section
+          uv /= 0.75;
+            // displayId = 0;
+        }
+      }
+    }
+
+  // retrive Gbuffers data using texelFetch
+  vec3 position = texture(uGPosition, uv).xyz;
+
+  vec3 N = texture(uGNormal, uv).xyz;
   vec3 V = normalize(-position);
   vec3 L = normalize(uLightDirection);
   vec3 H = normalize(L + V);
 
   vec3 radiance = uLightColor * uLightIntensity;
 
-  vec3 albedo = texelFetch(uGAlbedo, ivec2(gl_FragCoord.xy), 0).xyz;
-  vec3 occlusionRoughnessMetallic = texelFetch(uGOcclusionRoughnessMetallic, ivec2(gl_FragCoord.xy), 0).xyz;
+  vec3 albedo = texture(uGAlbedo, uv).xyz;
+  vec3 occlusionRoughnessMetallic = texture(uGOcclusionRoughnessMetallic, uv).xyz;
   float occlusion = occlusionRoughnessMetallic.r;
   float roughness = occlusionRoughnessMetallic.g;
   float metallic = occlusionRoughnessMetallic.b;
-  vec3 emissive = texelFetch(uGEmissive, ivec2(gl_FragCoord.xy), 0).xyz;
+  vec3 emissive = texture(uGEmissive, uv).xyz;
 
   vec3 dielectricSpecular = vec3(0.04);
   // base reflectivity 
@@ -126,13 +163,12 @@ void main() {
   color = mix(color, color * occlusion, uOcclusionStrength);
   // SSAO
   float ssao = texelFetch(uSSAO, ivec2(gl_FragCoord.xy), 0).r;
-  color *= float(uEnableSSAO) * ssao;
+  if(uEnableSSAO == 1) color *= ssao;
 
   color = linear2srgb(color);
 
   if(uDeferredShadingDisplayId == 1) { // overlay mode
-    int textureID = int(vTexCoords.x*3) + int(3) * int((1-vTexCoords.y)*3);
-    switch (textureID) {
+    switch (displayId) {
       case 0:
         // nothing show all
         break;
@@ -162,8 +198,11 @@ void main() {
         color = vec3(ssao);
         break;
     }
-  }
 
+    float lineSize = 0.005;
+    color += step(1, displayId) * 5 * (smoothstep(lineSize, 0., abs(uv.x)) + smoothstep(lineSize, 0., abs(uv.x-1)) +  smoothstep(lineSize, 0., abs(uv.y)) + smoothstep(lineSize, 0., abs(uv.y-1)) );
+    color = saturate(color); 
+  }
 
   fColor = color;
 }
