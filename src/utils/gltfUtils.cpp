@@ -40,7 +40,7 @@ namespace gltfUtils {
 
       const glm::ivec2 size = {image.width, image.height};
       textureObjects.emplace_back(size, GL_RGBA16F);
-      textureObjects[i].upload(GL_RGBA, image.pixel_type, image.image.data(), sampler);
+      textureObjects[i].uploadAndSetup(GL_RGBA, image.pixel_type, image.image.data(), sampler);
     }
 
     return textureObjects;

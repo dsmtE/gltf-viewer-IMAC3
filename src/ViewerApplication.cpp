@@ -131,15 +131,15 @@ int ViewerApplication::run() {
   // Create white texture for object with no base color texture
   Texture whiteTexture({1, 1}, GL_RGBA16F);
   const float white[] = {1, 1, 1, 1};
-  whiteTexture.upload(GL_RGBA, GL_FLOAT, white, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  whiteTexture.uploadAndSetup(GL_RGBA, GL_FLOAT, white, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   Texture blackTexture({1, 1}, GL_RGBA16F);
   const float black[] = {0, 0, 0, 1};
-  blackTexture.upload(GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  blackTexture.uploadAndSetup(GL_RGBA, GL_FLOAT, black, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   Texture bumpTexture({1, 1}, GL_RGBA16F);
   const float bump[] = {0, 0, 1, 1};
-  bumpTexture.upload(GL_RGBA, GL_FLOAT, bump, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
+  bumpTexture.uploadAndSetup(GL_RGBA, GL_FLOAT, bump, GL_LINEAR, GL_LINEAR, {GL_REPEAT, GL_REPEAT, GL_REPEAT});
 
   // Setup OpenGL state for rendering
   glEnable(GL_DEPTH_TEST);
@@ -290,6 +290,7 @@ int ViewerApplication::run() {
 
   bool shouldDraw = true;
   double secondLastDraw = 0;
+
   // Loop until the user closes the window
   for (size_t iterationCount = 0u; !m_GLFWHandle.shouldClose(); ++iterationCount) {
     const double seconds = glfwGetTime();
