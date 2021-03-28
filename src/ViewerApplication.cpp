@@ -43,16 +43,18 @@ int ViewerApplication::run() {
 
   CubeMap skyBox;
   
-  const std::array<std::string, 6> facesPaths = {
-    (m_AssetsRootPath / "skybox" / "right.jpg").string(),
-    (m_AssetsRootPath / "skybox" / "left.jpg").string(), 
-    (m_AssetsRootPath / "skybox" / "top.jpg").string(), 
-    (m_AssetsRootPath / "skybox" / "bottom.jpg").string(), 
-    (m_AssetsRootPath / "skybox" / "front.jpg").string(), 
-    (m_AssetsRootPath / "skybox" / "back.jpg").string()
-  };
+  // const std::array<std::string, 6> facesPaths = {
+  //   (m_AssetsRootPath / "skybox" / "right.jpg").string(),
+  //   (m_AssetsRootPath / "skybox" / "left.jpg").string(), 
+  //   (m_AssetsRootPath / "skybox" / "top.jpg").string(), 
+  //   (m_AssetsRootPath / "skybox" / "bottom.jpg").string(), 
+  //   (m_AssetsRootPath / "skybox" / "front.jpg").string(), 
+  //   (m_AssetsRootPath / "skybox" / "back.jpg").string()
+  // };
   
-  skyBox.upload(facesPaths);
+  // skyBox.upload(facesPaths);
+
+  skyBox.uploadFromHDREquirectangular(m_ShadersRootPath, (m_AssetsRootPath / "Alexs_Apt_2k.hdr").string());
 
   // load model
   tinygltf::Model model;
