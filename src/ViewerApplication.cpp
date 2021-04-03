@@ -29,10 +29,11 @@ int ViewerApplication::run() {
   // Loader shaders
   GLProgram geometryPassProgram = compileProgram({m_ShadersRootPath / "geometryPass.vs.glsl", m_ShadersRootPath / "geometryPass.fs.glsl"});
   GLProgram shadingPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "shadingPass.fs.glsl"});
-  GLProgram ssaoPassProgramm = compileProgram({m_ShadersRootPath / "ssaoPass.vs.glsl", m_ShadersRootPath / "ssaoPass.fs.glsl"});
-  GLProgram ssaoBlurPassProgram = compileProgram({m_ShadersRootPath / "ssaoPass.vs.glsl", m_ShadersRootPath / "ssaoBlurPass.fs.glsl"});
+  GLProgram ssaoPassProgramm = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "ssaoPass.fs.glsl"});
+  GLProgram ssaoBlurPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "ssaoBlurPass.fs.glsl"});
 
   GLProgram cubeMapPassProgram = compileProgram({m_ShadersRootPath / "cubeMap.vs.glsl", m_ShadersRootPath / "cubeMap.fs.glsl"});
+  
 
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
@@ -373,7 +374,7 @@ int ViewerApplication::run() {
         gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-2);
       }else {
         // SSAO Occlusion
-        SSAOBlurFB.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, 0);
+        SSAOBlurFB.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT);
       }
 
       // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
