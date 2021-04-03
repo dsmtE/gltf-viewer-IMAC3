@@ -7,6 +7,7 @@
 #include "utils/SSAOFrameBuffer.hpp"
 #include "utils/TextureFB.hpp"
 #include "utils/CubeMap.hpp"
+#include "utils/BlurFB.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -36,6 +37,8 @@ int ViewerApplication::run() {
   
   GLProgram depthPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "depthPass.fs.glsl"});
 
+  GLProgram blurPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "gaussianBlur.fs.glsl"});
+
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
   SSAOFrameBuffer ssaoFB({m_nWindowWidth, m_nWindowHeight});
@@ -44,6 +47,8 @@ int ViewerApplication::run() {
 
   CubeMap skyBox;
   
+  BlurFB blurFB({m_nWindowWidth, m_nWindowHeight}, GL_RGB16F);
+
   // const std::array<std::string, 6> facesPaths = {
   //   (m_AssetsRootPath / "skybox" / "right.jpg").string(),
   //   (m_AssetsRootPath / "skybox" / "left.jpg").string(), 
@@ -394,8 +399,39 @@ int ViewerApplication::run() {
 
       }
 
-      // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
-      // gBuffer.copyTo({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_DEPTH_BUFFER_BIT);
+      /*
+      // blurTest
+      // blit current color buffer to  our pingPong FBO
+      GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, 0));
+      blurFB.bindPong(GL_DRAW_FRAMEBUFFER);
+      GLCALL(glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST));
+      blurFB.unbind(GL_DRAW_FRAMEBUFFER);
+
+      blurFB.bind();
+      bool horizontal = true;
+
+      blurPassProgram.use();
+      blurPassProgram.setInt("tex", 0);
+      for (unsigned int i = 0; i < 30; ++i) {
+        blurPassProgram.setInt("horizontal", horizontal);
+        if(horizontal) {
+          blurFB.bindPing();
+          blurFB.bindPongTexToSlot();
+        }else {
+          blurFB.bindPong();
+          blurFB.bindPingTexToSlot();
+        }
+
+        gBuffer.render();
+        horizontal = !horizontal;
+      }
+      
+      blurFB.unbind();
+      
+      // blit to screen
+      blurFB.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT);
+      */
+
     }
 
     // GUI code:
