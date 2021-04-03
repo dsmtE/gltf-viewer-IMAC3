@@ -7,6 +7,7 @@
 #include "utils/SSAOFrameBuffer.hpp"
 #include "utils/TextureFB.hpp"
 #include "utils/CubeMap.hpp"
+#include "utils/BloomFB.hpp"
 #include "utils/BlurFB.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -37,6 +38,8 @@ int ViewerApplication::run() {
   
   GLProgram depthPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "depthPass.fs.glsl"});
 
+  GLProgram splitlightPassProgram_ = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "bloomSPlitLightPass.fs.glsl"});
+  GLProgram bloomPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "bloomPass.fs.glsl"});
   GLProgram blurPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "gaussianBlur.fs.glsl"});
 
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
@@ -47,6 +50,7 @@ int ViewerApplication::run() {
 
   CubeMap skyBox;
   
+  BloomFB bloomFB({m_nWindowWidth, m_nWindowHeight});
   BlurFB blurFB({m_nWindowWidth, m_nWindowHeight}, GL_RGB16F);
 
   // const std::array<std::string, 6> facesPaths = {
@@ -378,6 +382,66 @@ int ViewerApplication::run() {
 
           skyBox.draw();
           GLCALL(glDepthMask(GL_LESS)); // set depth function back to default
+
+
+          // Bloom
+          // blit current color buffer to scene texture BloomFBO
+          GLCALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, 0));
+          bloomFB.bindScene(GL_DRAW_FRAMEBUFFER);
+          GLCALL(glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST));
+          bloomFB.unbind(GL_DRAW_FRAMEBUFFER);
+          
+          // Split light
+          bloomFB.bindLights();
+          splitlightPassProgram_.use();
+          bloomFB.bindSceneTexture(0);
+          splitlightPassProgram_.setInt("uScene", 0);
+          splitlightPassProgram_.setFloat("uThreshold", bloomFB.threshold());
+
+          gBuffer.render();
+          bloomFB.unbind();
+
+          // blit lights bloom texture to our pingPong blur FBO
+          bloomFB.bind(GL_READ_FRAMEBUFFER);
+	        GLCALL(glReadBuffer(GL_COLOR_ATTACHMENT1));
+
+          blurFB.bindPong(GL_DRAW_FRAMEBUFFER);
+          GLCALL(glBlitFramebuffer(0, 0, m_nWindowWidth, m_nWindowHeight, 0, 0, m_nWindowWidth, m_nWindowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST));
+          blurFB.unbind(GL_DRAW_FRAMEBUFFER);
+          bloomFB.unbind(GL_READ_FRAMEBUFFER);
+
+          blurFB.bind();
+          bool horizontal = true;
+
+          blurPassProgram.use();
+          blurPassProgram.setInt("tex", 0);
+          for (int i = 0; i < 2*bloomFB.quality(); ++i) {
+            blurPassProgram.setInt("horizontal", horizontal);
+            if(horizontal) {
+              blurFB.bindPing();
+              blurFB.bindPongTexToSlot(0);
+            }else {
+              blurFB.bindPong();
+              blurFB.bindPingTexToSlot(0);
+            }
+
+            gBuffer.render();
+            horizontal = !horizontal;
+          }
+          blurFB.unbind();
+          
+          // bloom display path
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          bloomPassProgram.use();
+          bloomFB.setUniforms(bloomPassProgram);
+
+          bloomFB.bindSceneTexture(0);
+          bloomPassProgram.setInt("uScene", 0);
+
+          blurFB.bindPongTexToSlot(1);
+          bloomPassProgram.setInt("uBloomBlur", 1);
+        
+          gBuffer.render();
         }
 
       }else if (deferredShadingDisplayId <= 6) {
@@ -499,6 +563,7 @@ int ViewerApplication::run() {
         
         if(tangentAvailable) ImGui::Checkbox("enable normal mapping", &normalEnable);
         if(SSAOEnable) ssaoFB.imguiMenu();
+        bloomFB.imguiMenu();
       }
       
       ImGui::End();
