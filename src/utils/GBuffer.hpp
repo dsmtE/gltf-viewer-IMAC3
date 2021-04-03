@@ -10,7 +10,9 @@ class GBuffer : public FrameBuffer {
         ~GBuffer();
         
         void bindTextures() const;
+        void bindDepthTextures(const int slot = 0) const;
         void bindTexturesToShader(GLProgram& shaderProgram) const;
+
         void render() const;
 
     private:
@@ -20,6 +22,7 @@ class GBuffer : public FrameBuffer {
         Texture albedoTex_;
         Texture occlusionRoughnessMetallicTex_;
         Texture emissiveTex_;
+        Texture depthTex_;
         
         GLuint depthRenderBufferId_;
 

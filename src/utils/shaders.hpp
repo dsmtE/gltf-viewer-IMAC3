@@ -125,7 +125,7 @@ class GLProgram {
   std::unordered_map<std::string, bool> uniformMissingWarning_;
 
 public:
-  GLProgram() : id_(glCreateProgram()) {}
+  GLProgram() : id_(GLCALL(glCreateProgram())) {}
 
   ~GLProgram() { GLCALL(glDeleteProgram(id_));}
 

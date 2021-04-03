@@ -8,7 +8,7 @@ namespace glDebug {
 		const char* sourceStr = glEnumToStr::find(glEnumToStr::source, source);
 		const char* typeStr = glEnumToStr::find(glEnumToStr::type, type);
 		const char* severityStr = glEnumToStr::find(glEnumToStr::severity, severity);
-		std::clog << "OpenGL: " << message << " [source=" << sourceStr << " type=" << typeStr << " severity=" << severityStr << " id=" << id << "]" << std::endl;
+		std::cerr << "OpenGL: " << message << " [source=" << sourceStr << " type=" << typeStr << " severity=" << severityStr << " id=" << id << "]" << std::endl;
 		DEBUG_BREAK();
 	}
     

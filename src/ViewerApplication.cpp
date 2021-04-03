@@ -34,6 +34,7 @@ int ViewerApplication::run() {
 
   GLProgram cubeMapPassProgram = compileProgram({m_ShadersRootPath / "cubeMap.vs.glsl", m_ShadersRootPath / "cubeMap.fs.glsl"});
   
+  GLProgram depthPassProgram = compileProgram({m_ShadersRootPath / "shadingPass.vs.glsl", m_ShadersRootPath / "depthPass.fs.glsl"});
 
   GBuffer gBuffer({m_nWindowWidth, m_nWindowHeight});
 
@@ -67,8 +68,10 @@ int ViewerApplication::run() {
   const glm::vec3 diag = bboxMax - bboxMin;
   const float maxDistance = glm::length(diag);
 
+  const float nearDistance = 0.001f * maxDistance;
+  const float farDistance = 1.5f * maxDistance;
   // Build projection matrix
-  const glm::mat4 projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight,0.001f * maxDistance, 1.5f * maxDistance);
+  const glm::mat4 projMatrix = glm::perspective(70.f, float(m_nWindowWidth) / m_nWindowHeight, nearDistance, farDistance);
   
   std::unique_ptr<CameraController> cameraController;
 
@@ -375,9 +378,20 @@ int ViewerApplication::run() {
       }else if (deferredShadingDisplayId <= 6) {
         // copy directly wanted texture without shadingPass
         gBuffer.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT, deferredShadingDisplayId-2);
-      }else {
+      }else if (deferredShadingDisplayId == 7) {
         // SSAO Occlusion
         SSAOBlurFB.copyToFromSlot({0, 0}, {m_nWindowWidth, m_nWindowHeight}, GL_COLOR_BUFFER_BIT);
+      }else {
+        // depth
+        depthPassProgram.use();
+        depthPassProgram.setFloat("nearDistance", nearDistance);
+        depthPassProgram.setFloat("farDistance", farDistance);
+
+        gBuffer.bindDepthTextures(0);
+        depthPassProgram.setInt("uDepth", 0);
+
+        gBuffer.render();
+
       }
 
       // copy depth content to screen frameBuffer for additionnal rendering on top of shadingPass
@@ -440,8 +454,8 @@ int ViewerApplication::run() {
       }
 
       if (ImGui::CollapsingHeader("Shading", ImGuiTreeNodeFlags_DefaultOpen)) {
-        static const char* DeferredShadingModes[]{"All", "Overlay", "Position", "Normal", "Albedo", "Occlusion/Roughness/Metallic", "Emissive", "SSAO Occlusion"};
-        ImGui::Combo("Deferred display textures", &deferredShadingDisplayId, DeferredShadingModes, 8);
+        static const char* DeferredShadingModes[]{"All", "Overlay", "Position", "Normal", "Albedo", "Occlusion/Roughness/Metallic", "Emissive", "SSAO Occlusion", "depth"};
+        ImGui::Combo("Deferred display textures", &deferredShadingDisplayId, DeferredShadingModes, 9);
 
         ImGui::Checkbox("enable occlusion", &occlusionEnable);
         ImGui::Checkbox("enable SSAO", &SSAOEnable);
